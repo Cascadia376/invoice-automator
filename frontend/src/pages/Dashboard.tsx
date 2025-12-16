@@ -1,0 +1,391 @@
+import { useInvoice } from "@/context/InvoiceContext";
+import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Search, Plus, Inbox, Beaker, MoreVertical, AlertCircle, Clock, FileText } from "lucide-react";
+
+export default function Dashboard() {
+    const { invoices, stats, deleteInvoice, updateInvoice, pushToQBO } = useInvoice();
+    const navigate = useNavigate();
+    const [searchTerm, setSearchTerm] = useState("");
+    const [statusFilter, setStatusFilter] = useState<'all' | 'needs_review' | 'pushed' | 'failed'>('all');
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+    const filteredInvoices = invoices.filter(invoice => {
+        const matchesSearch =
+            invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            invoice.vendorName.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
+
+        return matchesSearch && matchesStatus;
+    });
+
+    // Calculate dynamic stats from actual invoices
+    const totalOverdue = invoices
+        .filter(i => {
+            // Simple overdue logic: if status is needs_review and date is older than 30 days
+            // For now, we'll just mock it or assume 'failed' is overdue for this demo, 
+            // or add a real due date check if we have it later.
+            return false;
+        })
+        .reduce((sum, i) => sum + i.totalAmount, 0);
+
+    const pendingAmount = invoices
+        .filter(i => i.status === 'needs_review')
+        .reduce((sum, i) => sum + i.totalAmount, 0);
+
+    const approvedAmount = invoices
+        .filter(i => i.status === 'pushed' || i.status === 'approved')
+        .reduce((sum, i) => sum + i.totalAmount, 0);
+
+    const maxAmount = Math.max(pendingAmount, approvedAmount, 1); // Avoid div by 0
+
+    const toggleSelectAll = () => {
+        if (selectedIds.size === filteredInvoices.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(filteredInvoices.map(i => i.id)));
+        }
+    };
+
+    const toggleSelect = (id: string) => {
+        const newSelected = new Set(selectedIds);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedIds(newSelected);
+    };
+
+    const handleBulkDelete = async () => {
+        if (!confirm(`Are you sure you want to delete ${selectedIds.size} invoices?`)) return;
+
+        for (const id of selectedIds) {
+            await deleteInvoice(id);
+        }
+        setSelectedIds(new Set());
+        toast.success("Invoices deleted");
+    };
+
+    const handleBulkApprove = async () => {
+        for (const id of selectedIds) {
+            await pushToQBO(id);
+        }
+        setSelectedIds(new Set());
+        toast.success("Invoices approved and pushed");
+    };
+
+    const handleBulkReject = async () => {
+        for (const id of selectedIds) {
+            await updateInvoice(id, { status: 'failed' });
+        }
+        setSelectedIds(new Set());
+        toast.success("Invoices rejected");
+    };
+
+    const handleLoadDemo = async () => {
+        const toastId = toast.loading("Generating demo invoice...");
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:8000'}/api/seed/demo`, {
+                method: "POST",
+                headers: { 'Authorization': `Bearer ${(window as any).Clerk?.session?.getToken()}` }
+            });
+            if (!res.ok) throw new Error("Failed");
+            toast.success("Demo invoice loaded! Jarvis is ready.", { id: toastId });
+            setTimeout(() => window.location.reload(), 1000);
+        } catch (e) {
+            toast.error("Could not load demo data", { id: toastId });
+        }
+    };
+
+    const handleExportCSV = () => {
+        if (filteredInvoices.length === 0) {
+            toast.error("No invoices to export");
+            return;
+        }
+
+        const headers = ["Invoice Number", "Vendor", "Date", "Amount", "Currency", "Status", "ID"];
+        const csvContent = [
+            headers.join(","),
+            ...filteredInvoices.map(invoice => [
+                `"${invoice.invoiceNumber}"`,
+                `"${invoice.vendorName}"`,
+                `"${invoice.date}"`,
+                invoice.totalAmount,
+                `"${invoice.currency}"`,
+                `"${invoice.status}"`,
+                `"${invoice.id}"`
+            ].join(","))
+        ].join("\n");
+
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `invoices_export_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = "hidden";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success(`Exported ${filteredInvoices.length} invoices`);
+    };
+
+    return (
+        <div className="space-y-6">
+
+            <div className="flex flex-wrap justify-between items-center gap-4">
+                <p className="text-3xl font-black leading-tight tracking-[-0.033em] text-gray-900">Invoices</p>
+                <div className="flex gap-2">
+                    {selectedIds.size > 0 && (
+                        <div className="flex gap-2 animate-in fade-in slide-in-from-top-2 bg-white p-1 rounded-lg border border-gray-200 shadow-sm mr-2">
+                            <button onClick={handleBulkApprove} className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
+                                Approve ({selectedIds.size})
+                            </button>
+                            <button onClick={handleBulkReject} className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors">
+                                Reject ({selectedIds.size})
+                            </button>
+                            <button onClick={handleBulkDelete} className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors">
+                                Delete ({selectedIds.size})
+                            </button>
+                        </div>
+                    )}
+                    <button
+                        onClick={handleExportCSV}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+                    >
+                        <FileText className="h-4 w-4" />
+                        Export CSV
+                    </button>
+                </div>
+            </div>
+
+            <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-4">
+                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-gray-500">Total Overdue</p>
+                            <p className="mt-2 text-3xl font-bold text-gray-900">$0.00</p>
+                        </div>
+                        <div className="rounded-full bg-red-50 p-3">
+                            <AlertCircle className="h-6 w-6 text-red-500" />
+                        </div>
+                    </div>
+                    <div className="mt-4 flex items-center text-sm text-red-600">
+                        <span className="font-medium">0 invoices</span>
+                        <span className="ml-2 text-gray-400">• Past due</span>
+                    </div>
+                </div>
+
+                <div
+                    onClick={() => setStatusFilter('needs_review')}
+                    className={`cursor-pointer rounded-xl border bg-white p-6 shadow-sm transition-all hover:shadow-md ${statusFilter === 'needs_review' ? 'ring-2 ring-amber-500 ring-offset-2' : 'border-gray-200'}`}
+                >
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-gray-500">Pending Approval</p>
+                            <p className="mt-2 text-3xl font-bold text-gray-900">
+                                {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(pendingAmount)}
+                            </p>
+                        </div>
+                        <div className="rounded-full bg-amber-50 p-3">
+                            <Clock className="h-6 w-6 text-amber-500" />
+                        </div>
+                    </div>
+                    <div className="mt-4 flex items-center text-sm text-amber-600">
+                        <span className="font-medium">{invoices.filter(i => i.status === 'needs_review').length} invoices</span>
+                        <span className="ml-2 text-gray-400">• Action required</span>
+                    </div>
+                </div>
+
+                <div
+                    onClick={() => setStatusFilter('all')}
+                    className="cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md"
+                >
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-gray-500">Processed (30d)</p>
+                            <p className="mt-2 text-3xl font-bold text-gray-900">{stats.totalInvoices}</p>
+                        </div>
+                        <div className="rounded-full bg-blue-50 p-3">
+                            <FileText className="h-6 w-6 text-blue-500" />
+                        </div>
+                    </div>
+                    <div className="mt-4 flex items-center text-sm text-blue-600">
+                        <span className="font-medium">+12%</span>
+                        <span className="ml-2 text-gray-400">from last month</span>
+                    </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <p className="mb-6 text-sm font-medium text-gray-500">Volume by Status</p>
+                    <div className="flex items-end justify-between gap-4 h-16">
+                        <div className="flex flex-col items-center gap-2 flex-1">
+                            <div className="w-full rounded-t-md bg-green-500/10 h-full relative group">
+                                <div className="absolute bottom-0 w-full rounded-t-md bg-success transition-all duration-500 group-hover:bg-green-600" style={{ height: `${(approvedAmount / maxAmount) * 100}%`, minHeight: '4px' }}></div>
+                            </div>
+                            <span className="text-xs font-medium text-gray-600">Approved</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-2 flex-1">
+                            <div className="w-full rounded-t-md bg-amber-500/10 h-full relative group">
+                                <div className="absolute bottom-0 w-full rounded-t-md bg-warning transition-all duration-500 group-hover:bg-amber-500" style={{ height: `${(pendingAmount / maxAmount) * 100}%`, minHeight: '4px' }}></div>
+                            </div>
+                            <span className="text-xs font-medium text-gray-600">Pending</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-2 flex-1">
+                            <div className="w-full rounded-t-md bg-red-500/10 h-full relative group">
+                                <div className="absolute bottom-0 w-full rounded-t-md bg-danger transition-all duration-500 group-hover:bg-red-600" style={{ height: "4px" }}></div>
+                            </div>
+                            <span className="text-xs font-medium text-gray-600">Overdue</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex gap-2 p-1 bg-gray-100 rounded-lg self-start">
+                    <button
+                        onClick={() => setStatusFilter('all')}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        All
+                    </button>
+                    <button
+                        onClick={() => setStatusFilter('needs_review')}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === 'needs_review' ? 'bg-white text-warning shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Pending
+                    </button>
+                    <button
+                        onClick={() => setStatusFilter('pushed')}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === 'pushed' ? 'bg-white text-success shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Approved
+                    </button>
+                    <button
+                        onClick={() => setStatusFilter('failed')}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === 'failed' ? 'bg-white text-danger shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Rejected
+                    </button>
+                </div>
+
+                <div className="relative flex-grow min-w-[200px]">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
+                    <input
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-500 focus:border-primary focus:ring-primary focus:ring-1 focus:outline-none transition-shadow"
+                        placeholder="Search invoices..."
+                        type="text"
+                    />
+                </div>
+                <button
+                    onClick={() => navigate("/upload")}
+                    className="flex-shrink-0 flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors shadow-sm"
+                >
+                    <Plus className="h-6 w-6" />
+                </button>
+            </div>
+
+            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-4 py-3" scope="col">
+                                    <input
+                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                        type="checkbox"
+                                        checked={selectedIds.size === filteredInvoices.length && filteredInvoices.length > 0}
+                                        onChange={toggleSelectAll}
+                                    />
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" scope="col">Invoice #</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" scope="col">Vendor Name</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" scope="col">Amount</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" scope="col">Status</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" scope="col">Date</th>
+                                <th className="relative px-4 py-3" scope="col"><span className="sr-only">Actions</span></th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 bg-white">
+                            {filteredInvoices.length === 0 ? (
+                                <tr>
+                                    <td colSpan={7} className="px-4 py-16 text-center text-gray-500">
+                                        <div className="flex flex-col items-center justify-center gap-4">
+                                            <div className="rounded-full bg-gray-50 p-6">
+                                                <Inbox className="h-12 w-12 text-gray-300" />
+                                            </div>
+                                            <div>
+                                                <p className="text-lg font-medium text-gray-900">No invoices found</p>
+                                                <p className="text-sm text-gray-500">
+                                                    {searchTerm || statusFilter !== 'all' ? "Try adjusting your filters" : "Upload a PDF or try our demo data"}
+                                                </p>
+                                            </div>
+                                            {!searchTerm && statusFilter === 'all' && (
+                                                <button
+                                                    onClick={handleLoadDemo}
+                                                    className="mt-2 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-all"
+                                                >
+                                                    <Beaker className="h-4 w-4" />
+                                                    Load Demo Data
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredInvoices.map((invoice) => (
+                                    <tr
+                                        key={invoice.id}
+                                        className="hover:bg-gray-50 cursor-pointer transition-colors"
+                                        onClick={() => navigate(`/invoices/${invoice.id}`)}
+                                    >
+                                        <td className="whitespace-nowrap px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                type="checkbox"
+                                                checked={selectedIds.has(invoice.id)}
+                                                onChange={() => toggleSelect(invoice.id)}
+                                            />
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">{invoice.invoiceNumber}</td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{invoice.vendorName}</td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900 font-medium">
+                                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: invoice.currency }).format(invoice.totalAmount)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-sm">
+                                            {invoice.status === 'needs_review' && (
+                                                <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
+                                                    <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-yellow-500"></span>Pending
+                                                </span>
+                                            )}
+                                            {(invoice.status === 'pushed' || invoice.status === 'approved') && (
+                                                <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                                                    <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-green-500"></span>Approved
+                                                </span>
+                                            )}
+                                            {invoice.status === 'failed' && (
+                                                <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
+                                                    <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-red-500"></span>Rejected
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">{invoice.date}</td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium">
+                                            <button className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100">
+                                                <MoreVertical className="h-4 w-4" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+}

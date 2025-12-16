@@ -1,0 +1,19 @@
+issuer: Generic Invoice
+keywords:
+  - Invoice
+  - Total
+fields:
+  invoice_number:
+    - Invoice\s*#?\s*[:.]?\s*([A-Za-z0-9-]+)
+    - Invoice Number\s*[:.]?\s*([A-Za-z0-9-]+)
+  date:
+    - (\d{1,2}[/-]\d{1,2}[/-]\d{2,4})
+    - Date\s*[:.]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})
+  amount:
+    - Total\s*[:.]?\s*[$€£]?\s*([\d,]+\.\d{2})
+    - Amount Due\s*[:.]?\s*[$€£]?\s*([\d,]+\.\d{2})
+  currency:
+    - (USD|EUR|GBP|CAD)
+options:
+  currency: USD
+  remove_whitespace: false

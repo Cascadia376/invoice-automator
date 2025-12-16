@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+pdfplumber
+python-multipart
+boto3
+psycopg2-binary
+invoice2data
+openai
+python-quickbooks
+pymupdf
+pillow
+pyjwt
+requests
+cryptography
+stripe

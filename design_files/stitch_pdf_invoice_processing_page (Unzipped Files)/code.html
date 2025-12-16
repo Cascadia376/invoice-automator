@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html class="h-full" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>InvoiceAI - Process Invoice</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563EB', // Blue-600
+                        "background-light": '#ffffff', // White
+                        "background-dark": '#0F172A', // Slate-900
+                    },
+                    fontFamily: {
+                        display: ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: '0.5rem', // 8px
+                    },
+                },
+            },
+        };
+    </script>
+<style>
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .group:hover .group-hover\:block {
+            display: block;
+        }
+        .group:hover .group-hover\:opacity-100 {
+            opacity: 1;
+        }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        .sortable-header .sort-icon {
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+        }
+        .sortable-header:hover .sort-icon {
+            opacity: 0.5;
+        }
+        .sortable-header.active .sort-icon {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="h-full font-display bg-background-light dark:bg-background-dark text-slate-800 dark:text-slate-200">
+<div class="flex flex-col h-screen">
+<header class="flex-shrink-0 border-b border-slate-200 dark:border-slate-700 bg-background-light dark:bg-background-dark">
+<div class="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8">
+<div class="flex items-center justify-between h-16">
+<div class="flex items-center">
+<div class="flex items-center gap-2 text-xl font-bold">
+<div class="bg-primary p-1.5 rounded-lg flex items-center justify-center">
+<span class="material-icons text-white" style="font-size: 20px;">receipt_long</span>
+</div>
+<span class="text-slate-900 dark:text-white">InvoiceAI</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="px-4 py-2 text-sm font-medium border rounded-lg border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background-light dark:focus:ring-offset-background-dark focus:ring-primary" type="button">
+                            Save
+                        </button>
+<button class="px-4 py-2 text-sm font-medium text-white border border-transparent rounded-lg bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background-light dark:focus:ring-offset-background-dark focus:ring-primary" type="button">
+                            Export
+                        </button>
+</div>
+</div>
+</div>
+</header>
+<main class="flex-grow min-h-0">
+<div class="flex h-full">
+<div class="relative h-full bg-slate-50 dark:bg-slate-800/50 p-4 md:p-6 lg:p-8 flex flex-col" id="pdf-panel" style="width: 33.33%;">
+<div class="flex items-center justify-between pb-4">
+<h2 class="text-lg font-semibold text-slate-900 dark:text-white">Invoice Preview</h2>
+<div class="flex items-center gap-2 p-1 bg-white rounded-lg shadow-sm dark:bg-slate-700 border border-slate-200 dark:border-slate-600">
+<button class="p-1.5 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-600"><span class="material-icons text-base">zoom_out</span></button>
+<span class="text-sm font-medium text-slate-700 dark:text-slate-300">100%</span>
+<button class="p-1.5 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-600"><span class="material-icons text-base">zoom_in</span></button>
+</div>
+</div>
+<div class="flex-grow flex items-center justify-center bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
+<div class="text-center">
+<span class="material-icons text-5xl text-slate-300 dark:text-slate-600">picture_as_pdf</span>
+<p class="mt-2 text-sm text-slate-400 dark:text-slate-500">PDF invoice view</p>
+</div>
+</div>
+</div>
+<div class="h-full w-2 cursor-col-resize bg-slate-200 dark:bg-slate-700 hover:bg-primary/50 flex items-center justify-center" id="resizer">
+<div class="w-0.5 h-8 bg-slate-400 dark:bg-slate-500 rounded-full"></div>
+</div>
+<div class="flex-1 h-full p-4 md:p-6 lg:p-8 overflow-y-auto" id="data-panel">
+<div class="flex justify-between items-start mb-8">
+<h2 class="text-lg font-semibold text-slate-900 dark:text-white">Extracted Data</h2>
+</div>
+<form class="space-y-8">
+<div class="space-y-6">
+<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+<div>
+<label class="block text-sm font-medium text-slate-600 dark:text-slate-400" for="invoice-number">Invoice Number</label>
+<div class="mt-1">
+<input class="block w-full border-slate-300 rounded-md shadow-sm dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 focus:ring-primary focus:border-primary sm:text-sm" id="invoice-number" name="invoice-number" type="text" value="INV-2023-001"/>
+</div>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-600 dark:text-slate-400" for="vendor-name">Vendor Name</label>
+<div class="mt-1">
+<input class="block w-full border-slate-300 rounded-md shadow-sm dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 focus:ring-primary focus:border-primary sm:text-sm" id="vendor-name" name="vendor-name" type="text" value="Creative Inc."/>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+<div>
+<label class="block text-sm font-medium text-slate-600 dark:text-slate-400" for="issue-date">Issue Date</label>
+<div class="mt-1">
+<input class="block w-full border-slate-300 rounded-md shadow-sm dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 focus:ring-primary focus:border-primary sm:text-sm" id="issue-date" name="issue-date" type="date" value="2023-10-26"/>
+</div>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-600 dark:text-slate-400" for="due-date">Due Date</label>
+<div class="mt-1">
+<input class="block w-full border-slate-300 rounded-md shadow-sm dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 focus:ring-primary focus:border-primary sm:text-sm" id="due-date" name="due-date" type="date" value="2023-11-25"/>
+</div>
+</div>
+</div>
+</div>
+<div>
+<h3 class="text-lg font-semibold leading-6 text-slate-900 dark:text-white">Line Items</h3>
+<div class="mt-4 flow-root">
+<div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+<div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+<div class="overflow-hidden border border-slate-200 dark:border-slate-700 rounded-lg">
+<div class="absolute -top-8 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 text-sm font-medium text-white bg-slate-900 dark:bg-slate-700 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+    Warning: Line total mismatch.
+    <div class="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900 dark:border-t-slate-700"></div>
+</div><div class="absolute -top-8 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 text-sm font-medium text-white bg-slate-900 dark:bg-slate-700 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+    Error: Negative quantity detected.
+    <div class="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900 dark:border-t-slate-700"></div>
+</div><table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+<thead class="bg-slate-50 dark:bg-slate-800">
+<tr>
+<th class="py-2.5 px-3 text-left text-sm font-semibold text-slate-900 dark:text-slate-100 w-[18%]" scope="col">
+<a class="sortable-header group inline-flex items-center" href="#">
+        SKU
+        <span class="sort-icon ml-1.5 flex-none rounded text-slate-400">
+<span class="material-symbols-outlined text-base">unfold_more</span>
+</span>
+</a>
+</th>
+<th class="py-2.5 px-3 text-left text-sm font-semibold text-slate-900 dark:text-slate-100 w-[35%]" scope="col">
+<a class="sortable-header group inline-flex items-center" href="#">
+        Description
+        <span class="sort-icon ml-1.5 flex-none rounded text-slate-400">
+<span class="material-symbols-outlined text-base">unfold_more</span>
+</span>
+</a>
+</th>
+<th class="py-2.5 px-3 text-left text-sm font-semibold text-slate-900 dark:text-slate-100" scope="col">
+<a class="sortable-header group inline-flex items-center" href="#">
+        Units/Case
+        <span class="sort-icon ml-1.5 flex-none rounded text-slate-400">
+<span class="material-symbols-outlined text-base">unfold_more</span>
+</span>
+</a>
+</th>
+<th class="py-2.5 px-3 text-left text-sm font-semibold text-slate-900 dark:text-slate-100" scope="col">
+<a class="sortable-header group inline-flex items-center" href="#">
+        Cases
+        <span class="sort-icon ml-1.5 flex-none rounded text-slate-400">
+<span class="material-symbols-outlined text-base">unfold_more</span>
+</span>
+</a>
+</th>
+<th class="py-2.5 px-3 text-left text-sm font-semibold text-slate-900 dark:text-slate-100" scope="col">
+<a class="sortable-header group inline-flex items-center" href="#">
+        Quantity
+        <span class="sort-icon ml-1.5 flex-none rounded text-slate-400">
+<span class="material-symbols-outlined text-base">unfold_more</span>
+</span>
+</a>
+</th>
+<th class="py-2.5 px-3 text-left text-sm font-semibold text-slate-900 dark:text-slate-100" scope="col">
+<a class="sortable-header group inline-flex items-center active" href="#">
+        Unit Cost
+        <span class="sort-icon ml-1.5 flex-none rounded text-slate-500 dark:text-slate-300">
+<span class="material-symbols-outlined text-base">arrow_upward</span>
+</span>
+</a>
+</th>
+<th class="py-2.5 px-3 text-right text-sm font-semibold text-slate-900 dark:text-slate-100" scope="col">
+<a class="sortable-header group inline-flex items-center" href="#">
+        Total
+        <span class="sort-icon ml-1.5 flex-none rounded text-slate-400">
+<span class="material-symbols-outlined text-base">unfold_more</span>
+</span>
+</a>
+</th>
+</tr>
+</thead>
+<tbody class="bg-white divide-y divide-slate-200 dark:bg-slate-800/50 dark:divide-slate-700">
+<tr class="group relative bg-yellow-100 dark:bg-yellow-900/20">
+<td class="px-3 py-1 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300">MNT-M-01</td>
+<td class="px-3 py-1 text-sm text-slate-600 dark:text-slate-300">Maintenance</td>
+<td class="px-3 py-1 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300 text-right">1</td>
+<td class="px-3 py-1 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300 text-right">12</td>
+<td class="px-3 py-1 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300 text-right">12</td>
+<td class="px-3 py-1 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300 text-right">$100.00</td>
+<td class="px-3 py-1 text-sm text-right whitespace-nowrap text-slate-500 dark:text-slate-400">$1,201.00</td>
+
+</tr>
+<tr class="group relative">
+<td class="px-3 py-1 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300">HOST-YR-01</td>
+<td class="px-3 py-1 text-sm text-slate-600 dark:text-slate-300">Hosting (1 year)</td>
+<td class="px-3 py-1 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300 text-right">1</td>
+<td class="px-3 py-1 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300 text-right">1</td>
+<td class="px-3 py-1 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300 text-right">1</td>
+<td class="px-3 py-1 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300 text-right">$300.00</td>
+<td class="px-3 py-1 text-sm text-right whitespace-nowrap text-slate-500 dark:text-slate-400">$300.00</td>
+</tr>
+<tr class="group relative bg-red-100 dark:bg-red-900/20">
+<td class="px-3 py-1 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300">WD-001</td>
+<td class="px-3 py-1 text-sm text-slate-600 dark:text-slate-300">Website Design</td>
+<td class="px-3 py-1 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300 text-right">1</td>
+<td class="px-3 py-1 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300 text-right">1</td>
+<td class="px-3 py-1 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300 text-right">-1</td>
+<td class="px-3 py-1 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300 text-right">$2,500.00</td>
+<td class="px-3 py-1 text-sm text-right whitespace-nowrap text-slate-500 dark:text-slate-400">-$2,500.00</td>
+
+</tr>
+</tbody>
+</table>
+</div>
+<div class="mt-4 sm:px-6 lg:px-8">
+<button class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background-light dark:focus:ring-offset-background-dark focus:ring-primary" type="button">
+<span class="material-symbols-outlined text-base">add</span>
+<span>Add New Line Item</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="space-y-6">
+<div>
+<h3 class="text-lg font-semibold leading-6 text-slate-900 dark:text-white">Category/GL Code Totals</h3>
+<div class="mt-4 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
+<div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+<div class="overflow-hidden border border-slate-200 dark:border-slate-700 rounded-lg">
+<table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+<thead class="bg-slate-50 dark:bg-slate-800">
+<tr>
+<th class="px-3 py-3.5 text-left text-sm font-semibold text-slate-900 dark:text-slate-100 w-3/5" scope="col">Category/GL Code</th>
+<th class="px-3 py-3.5 text-right text-sm font-semibold text-slate-900 dark:text-slate-100" scope="col">Subtotal</th>
+</tr>
+</thead>
+<tbody class="bg-white divide-y divide-slate-200 dark:bg-slate-800/50 dark:divide-slate-700">
+<tr>
+<td class="px-3 py-4 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300">6010 - Marketing &amp; Advertising</td>
+<td class="px-3 py-4 text-sm text-right whitespace-nowrap text-slate-500 dark:text-slate-400">$2,500.00</td>
+</tr>
+<tr>
+<td class="px-3 py-4 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300">7200 - IT &amp; Software</td>
+<td class="px-3 py-4 text-sm text-right whitespace-nowrap text-slate-500 dark:text-slate-400">$300.00</td>
+</tr>
+<tr>
+<td class="px-3 py-4 text-sm whitespace-nowrap text-slate-600 dark:text-slate-300">6550 - Professional Services</td>
+<td class="px-3 py-4 text-sm text-right whitespace-nowrap text-slate-500 dark:text-slate-400">$1,200.00</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="pt-2">
+<div class="max-w-sm ml-auto">
+<div class="space-y-3">
+<div class="flex items-center justify-between">
+<span class="text-sm font-medium text-slate-600 dark:text-slate-400">Line Item Total</span>
+<span class="text-sm font-medium text-slate-600 dark:text-slate-400">$4,000.00</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-sm font-medium text-slate-600 dark:text-slate-400">Sales Tax (8%)</span>
+<span class="text-sm font-medium text-slate-600 dark:text-slate-400">$320.00</span>
+</div>
+<div class="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-700">
+<span class="text-lg font-semibold text-slate-900 dark:text-white">Invoice Total</span>
+<span class="text-lg font-semibold text-slate-900 dark:text-white">$4,320.00</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="pt-8 border-t border-slate-200 dark:border-slate-700">
+<div class="flex justify-end gap-3">
+<button class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" type="button">
+<span class="material-symbols-outlined text-base -ml-1 mr-2">edit</span>
+<span>Edit</span>
+</button>
+<button class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-lg shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500" type="button">
+<span class="material-symbols-outlined text-base -ml-1 mr-2">close</span>
+<span>Reject</span>
+</button>
+<button class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-lg shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" type="button">
+<span class="material-symbols-outlined text-base -ml-1 mr-2">check</span>
+<span>Approve</span>
+</button>
+</div>
+</div>
+</form>
+</div>
+</div>
+</main>
+</div>
+</body></html>
