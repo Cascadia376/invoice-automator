@@ -45,12 +45,12 @@ export default function InvoiceReview() {
   const getPdfUrl = () => {
     if (!invoice?.fileUrl) return '';
     if (invoice.fileUrl.startsWith('http')) return invoice.fileUrl;
-    const API_BASE = import.meta.env.PROD ? 'https://invoice-processor-backend.onrender.com' : 'http://localhost:8000';
+    const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
     return `${API_BASE}${invoice.fileUrl}`;
   };
 
   const pdfUrl = getPdfUrl();
-  const API_BASE = import.meta.env.PROD ? 'https://invoice-processor-backend.onrender.com' : 'http://localhost:8000';
+  const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
 
   useEffect(() => {
     if (id) {
@@ -287,7 +287,7 @@ export default function InvoiceReview() {
                   const savedColumns = localStorage.getItem("csv_export_columns");
                   const savedConfig = localStorage.getItem("csv_export_config");
 
-                  const API_BASE = import.meta.env.PROD ? 'https://invoice-processor-backend.onrender.com' : 'http://localhost:8000';
+                  const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
                   // Token is already awaited due to 'await' keyword but verify context
                   const token = await getToken();
 

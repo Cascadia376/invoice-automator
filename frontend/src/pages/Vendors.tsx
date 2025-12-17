@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 
 const API_BASE = import.meta.env.PROD
-    ? 'https://invoice-processor-backend.onrender.com'
+    ? 'https://invoice-backend-a1gb.onrender.com'
     : 'http://localhost:8000';
 
 export default function Vendors() {
