@@ -22,7 +22,7 @@ interface InvoiceContextType {
 
 const InvoiceContext = createContext<InvoiceContextType | undefined>(undefined);
 
-const API_URL = '/api';
+const API_URL = `${import.meta.env.VITE_API_BASE || 'http://localhost:8000'}/api`;
 
 export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { getToken, orgId, user } = useAuth();
@@ -162,11 +162,11 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
         try {
             const token = await getToken();
-                const response = await fetch(`${API_URL}/invoices/upload`, {
-                    method: 'POST',
-                    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                    body: formData,
-                });
+            const response = await fetch(`${API_URL}/invoices/upload`, {
+                method: 'POST',
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: formData,
+            });
 
             if (response.ok) {
                 const newInvoice = await response.json();
