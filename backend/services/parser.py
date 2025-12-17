@@ -14,7 +14,32 @@ from database import SessionLocal
 import models
 from services import textract_service
 
-def extract_invoice_data(file_path: str, org_id: str, s3_key: str = None, s3_bucket: str = None):
+def normalize_currency(currency: str) -> str:
+    """Normalize currency codes to ISO format."""
+    if not currency:
+        return "USD"
+    
+    curr = str(currency).upper().strip()
+    # Handle common extraction errors
+    if curr in ["$CA", "CA$", "CDN", "CAD$", "C$"]:
+        return "CAD"
+    if curr in ["$", "US$", "USD$", "U.S."]:
+        return "USD"
+    
+    # If it's 3 letters, assume it's ISO
+    if len(curr) == 3:
+        return curr
+        
+    return "USD" # Default
+
+def safe_float(value, default=0.0):
+    """Safely convert value to float."""
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
     """
     Hybrid extraction strategy:
     1. Try invoice2data with existing templates (Fast, Free, Deterministic)
@@ -251,11 +276,13 @@ options:
             result = json.loads(content)
             print("GPT-4o extraction complete.")
 
-        # Save the new template
         if "template" in result and result["template"]:
             save_new_template(result["template"], result["data"].get("vendor_name", "unknown"), org_id)
             
-        return result["data"]
+        final_data = result.get("data", {})
+        final_data["currency"] = normalize_currency(final_data.get("currency"))
+        
+        return final_data
 
     except Exception as e:
         print(f"LLM Extraction failed: {e}")
@@ -300,9 +327,9 @@ def map_to_schema(data):
         "total_amount": float(data.get('amount', 0.0)),
         "subtotal": float(data.get('subtotal', 0.0)),
         "shipping_amount": float(data.get('shipping_amount', 0.0)),
-        "discount_amount": float(data.get('discount_amount', 0.0)),
+        "discount_amount": safe_float(data.get('discount_amount')),
         "tax_amount": 0.0,
-        "currency": data.get('currency', 'USD'),
+        "currency": normalize_currency(data.get('currency')),
         "line_items": data.get('lines', []) # Map invoice2data 'lines' to our 'line_items'
     }
 

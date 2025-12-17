@@ -12,6 +12,7 @@ import fitz # PyMuPDF
 import models, schemas, auth
 from database import get_db
 from services import parser, storage, vendor_service, validation_service
+from services.parser import safe_float
 
 router = APIRouter(
     prefix="/api/invoices",
@@ -104,17 +105,17 @@ async def upload_invoice(
                 invoice_id=file_id, 
                 sku=sku,
                 description=item.get("description", "Item"),
-                units_per_case=float(item.get("units_per_case", 1.0)),
-                cases=float(item.get("cases", 0.0)),
-                quantity=float(item.get("quantity", 1.0)),
-                unit_cost=float(item.get("unit_cost", 0.0)),
-                amount=float(item.get("amount", 0.0)),
+                units_per_case=safe_float(item.get("units_per_case", 1.0)),
+                cases=safe_float(item.get("cases", 0.0)),
+                quantity=safe_float(item.get("quantity", 1.0)),
+                unit_cost=safe_float(item.get("unit_cost", 0.0)),
+                amount=safe_float(item.get("amount", 0.0)),
                 category_gl_code=category_gl_code,
-                confidence_score=float(item.get("confidence_score", 1.0))
+                confidence_score=safe_float(item.get("confidence_score", 1.0))
             )
             db.add(db_item)
         
-        db.commit()
+        print(f"COMMITTING: {len(line_items_data)} line items")
         db.refresh(db_invoice)
         
         # Generate presigned URL for immediate display

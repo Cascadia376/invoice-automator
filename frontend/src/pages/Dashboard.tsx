@@ -384,7 +384,10 @@ export default function Dashboard() {
                                         <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">{invoice.invoiceNumber}</td>
                                         <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{invoice.vendorName}</td>
                                         <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900 font-medium">
-                                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: invoice.currency }).format(invoice.totalAmount)}
+                                            {new Intl.NumberFormat('en-US', {
+                                                style: 'currency',
+                                                currency: (['USD', 'CAD'].includes(invoice.currency?.toUpperCase()) ? invoice.currency.toUpperCase() : 'USD')
+                                            }).format(invoice.totalAmount)}
                                         </td>
                                         <td className="whitespace-nowrap px-4 py-3 text-sm">
                                             {invoice.status === 'needs_review' && (

@@ -20,7 +20,7 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex="https://invoice-automator-.*-cascadia376\.vercel\.app", # Support preview deployments
+    allow_origin_regex="https://invoice-automator-.*-cascadia376\.vercel\.app|https://cascadia-.*\.vercel\.app", # Support preview deployments
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,9 +44,16 @@ app.include_router(debug.router)
 def health_check():
     from database import SQLALCHEMY_DATABASE_URL
     db_type = "postgres" if "postgres" in SQLALCHEMY_DATABASE_URL else "sqlite"
+    
+    api_key = os.getenv("OPENAI_API_KEY")
+    api_key_present = bool(api_key)
+    if not api_key_present:
+        print("CRITICAL: OPENAI_API_KEY not found in environment!")
+        
     return {
         "status": "ok", 
         "version": "1.0.0",
         "database": db_type,
-        "database_url_masked": SQLALCHEMY_DATABASE_URL.split("@")[-1] if "@" in SQLALCHEMY_DATABASE_URL else "sqlite_local"
+        "database_url_masked": SQLALCHEMY_DATABASE_URL.split("@")[-1] if "@" in SQLALCHEMY_DATABASE_URL else "sqlite_local",
+        "openai_api_key_present": api_key_present
     }
