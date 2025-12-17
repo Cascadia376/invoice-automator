@@ -12,6 +12,8 @@ if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
 
 connect_args = {"check_same_thread": False} if "sqlite" in SQLALCHEMY_DATABASE_URL else {}
 
+print(f"DATABASE CONNECTION: {SQLALCHEMY_DATABASE_URL.split('@')[-1] if '@' in SQLALCHEMY_DATABASE_URL else 'sqlite_local'}")
+
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args=connect_args
 )

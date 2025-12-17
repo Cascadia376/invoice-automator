@@ -15,12 +15,12 @@ origins = [
     "http://localhost:5173",
     "https://cascadia-invoice-automator.vercel.app",
     "https://cascadia376-invoice-automator.vercel.app",
-    "https://invoice-automator-git-main-cascadia376.vercel.app",
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex="https://invoice-automator-.*-cascadia376\.vercel\.app", # Support preview deployments
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,4 +42,11 @@ app.include_router(debug.router)
 
 @app.get("/")
 def health_check():
-    return {"status": "ok", "version": "1.0.0"}
+    from database import SQLALCHEMY_DATABASE_URL
+    db_type = "postgres" if "postgres" in SQLALCHEMY_DATABASE_URL else "sqlite"
+    return {
+        "status": "ok", 
+        "version": "1.0.0",
+        "database": db_type,
+        "database_url_masked": SQLALCHEMY_DATABASE_URL.split("@")[-1] if "@" in SQLALCHEMY_DATABASE_URL else "sqlite_local"
+    }

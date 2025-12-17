@@ -40,6 +40,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const refreshInvoices = useCallback(async () => {
         setIsLoading(true);
+        console.log(`DEBUG: Refreshing invoices from ${API_URL}/invoices`);
         try {
             const token = await getToken();
             if (!token && !disableAuth) {
@@ -56,10 +57,13 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 console.log("DEBUG: Fetched invoices:", data);
                 setInvoices(data);
             } else {
-                console.error("DEBUG: Failed to fetch invoices. Status:", response.status);
+                console.error(`DEBUG: Failed to fetch invoices from ${API_URL}/invoices. Status: ${response.status} ${response.statusText}`);
+                if (response.status === 403 || response.status === 401) {
+                    console.error("DEBUG: Possible CORS or Auth issue.");
+                }
             }
         } catch (error) {
-            console.error("Failed to fetch invoices", error);
+            console.error(`DEBUG: Network or Fetch error for ${API_URL}/invoices:`, error);
         } finally {
             setIsLoading(false);
         }

@@ -12,7 +12,11 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./sql_app.db")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-engine = create_engine(DATABASE_URL)
+connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+
+print(f"DATABASE CONNECTION: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else 'sqlite_local'}")
+
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 
 def migrate():
     with engine.connect() as conn:
@@ -44,6 +48,13 @@ def migrate():
             conn.commit()
         except Exception as e:
             print(f"deposit_amount column might already exist or error: {e}")
+
+        try:
+            print("Adding issue_type column...")
+            conn.execute(text("ALTER TABLE invoices ADD COLUMN issue_type VARCHAR"))
+            conn.commit()
+        except Exception as e:
+            print(f"issue_type column might already exist or error: {e}")
 
         try:
             print("Adding vendor_id column...")
