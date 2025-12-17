@@ -22,10 +22,12 @@ interface InvoiceContextType {
 
 const InvoiceContext = createContext<InvoiceContextType | undefined>(undefined);
 
-const API_URL = `${import.meta.env.VITE_API_BASE || 'http://localhost:8000'}/api`;
+const API_BASE = import.meta.env.VITE_API_BASE ||
+    (import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000');
+const API_URL = `${API_BASE}/api`;
 
 export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { getToken, orgId, user } = useAuth();
+    const { getToken, orgId, user, disableAuth } = useAuth();
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [glCategories, setGlCategories] = useState<GLCategory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -40,7 +42,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setIsLoading(true);
         try {
             const token = await getToken();
-            if (!token) {
+            if (!token && !disableAuth) {
                 setIsLoading(false);
                 return;
             }
@@ -61,12 +63,12 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         } finally {
             setIsLoading(false);
         }
-    }, [getToken]);
+    }, [getToken, disableAuth]);
 
     const fetchGLCategories = useCallback(async () => {
         try {
             const token = await getToken();
-            if (!token) return;
+            if (!token && !disableAuth) return;
             const response = await fetch(`${API_URL}/gl-categories`, {
                 headers: {
                     ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -79,14 +81,14 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         } catch (error) {
             console.error("Failed to fetch GL categories", error);
         }
-    }, [getToken]);
+    }, [getToken, disableAuth]);
 
     useEffect(() => {
-        if (user || orgId) {
+        if (user || orgId || disableAuth) {
             refreshInvoices();
             fetchGLCategories();
         }
-    }, [user, orgId]);
+    }, [user, orgId, disableAuth, refreshInvoices, fetchGLCategories]);
 
     // Calculate stats whenever invoices change
     useEffect(() => {

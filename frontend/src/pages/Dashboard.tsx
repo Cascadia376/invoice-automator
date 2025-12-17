@@ -94,7 +94,9 @@ export default function Dashboard() {
         const toastId = toast.loading("Generating demo invoice...");
         try {
             const token = await getToken();
-            const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:8000'}/api/seed/demo`, {
+            const API_BASE = import.meta.env.VITE_API_BASE ||
+                (import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000');
+            const res = await fetch(`${API_BASE}/api/seed/demo`, {
                 method: "POST",
                 headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
             });

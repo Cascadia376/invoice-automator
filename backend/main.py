@@ -9,13 +9,22 @@ models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI()
 
-# CORS
+# CORS configuration
+origins = [
+    "http://localhost:8080",
+    "http://localhost:5173",
+    "https://cascadia-invoice-automator.vercel.app",
+    "https://cascadia376-invoice-automator.vercel.app",
+    "https://invoice-automator-git-main-cascadia376.vercel.app",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allow all origins for MVP
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # Use absolute path for uploads to avoid CWD issues
