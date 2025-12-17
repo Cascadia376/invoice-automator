@@ -1,14 +1,16 @@
 import { useInvoice } from "@/context/InvoiceContext";
+import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Search, Plus, Inbox, Beaker, MoreVertical, AlertCircle, Clock, FileText } from "lucide-react";
 
 export default function Dashboard() {
-    const { invoices, stats, deleteInvoice, updateInvoice, pushToQBO } = useInvoice();
+    const { invoices, stats, deleteInvoice, updateInvoice } = useInvoice();
+    const { getToken } = useAuth();
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState("");
-    const [statusFilter, setStatusFilter] = useState<'all' | 'needs_review' | 'pushed' | 'failed'>('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'needs_review' | 'approved' | 'failed'>('all');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     const filteredInvoices = invoices.filter(invoice => {
@@ -16,7 +18,10 @@ export default function Dashboard() {
             invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
             invoice.vendorName.toLowerCase().includes(searchTerm.toLowerCase());
 
-        const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
+        const matchesStatus =
+            statusFilter === 'all' ||
+            invoice.status === statusFilter ||
+            (statusFilter === 'approved' && invoice.status === 'pushed'); // legacy "pushed" treated as approved
 
         return matchesSearch && matchesStatus;
     });
@@ -36,7 +41,7 @@ export default function Dashboard() {
         .reduce((sum, i) => sum + i.totalAmount, 0);
 
     const approvedAmount = invoices
-        .filter(i => i.status === 'pushed' || i.status === 'approved')
+        .filter(i => i.status === 'approved')
         .reduce((sum, i) => sum + i.totalAmount, 0);
 
     const maxAmount = Math.max(pendingAmount, approvedAmount, 1); // Avoid div by 0
@@ -71,10 +76,10 @@ export default function Dashboard() {
 
     const handleBulkApprove = async () => {
         for (const id of selectedIds) {
-            await pushToQBO(id);
+            await updateInvoice(id, { status: 'approved' });
         }
         setSelectedIds(new Set());
-        toast.success("Invoices approved and pushed");
+        toast.success("Invoices approved");
     };
 
     const handleBulkReject = async () => {
@@ -88,9 +93,10 @@ export default function Dashboard() {
     const handleLoadDemo = async () => {
         const toastId = toast.loading("Generating demo invoice...");
         try {
+            const token = await getToken();
             const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:8000'}/api/seed/demo`, {
                 method: "POST",
-                headers: { 'Authorization': `Bearer ${(window as any).Clerk?.session?.getToken()}` }
+                headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
             });
             if (!res.ok) throw new Error("Failed");
             toast.success("Demo invoice loaded! Jarvis is ready.", { id: toastId });
@@ -258,8 +264,8 @@ export default function Dashboard() {
                         Pending
                     </button>
                     <button
-                        onClick={() => setStatusFilter('pushed')}
-                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === 'pushed' ? 'bg-white text-success shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        onClick={() => setStatusFilter('approved')}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === 'approved' ? 'bg-white text-success shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                         Approved
                     </button>
@@ -362,7 +368,7 @@ export default function Dashboard() {
                                                     <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-yellow-500"></span>Pending
                                                 </span>
                                             )}
-                                            {(invoice.status === 'pushed' || invoice.status === 'approved') && (
+                                            {invoice.status === 'approved' && (
                                                 <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
                                                     <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-green-500"></span>Approved
                                                 </span>

@@ -1,11 +1,20 @@
 import { Button } from "@/components/ui/button";
-import { FileText, Menu, X } from "lucide-react";
+import { FileText, Menu, X, LogOut } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
 
 export const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { session, user, signOut } = useAuth();
+
+  const handleSignIn = async () => {
+    const email = window.prompt("Enter your email to sign in with Supabase");
+    if (!email) return;
+    await supabase.auth.signInWithOtp({ email });
+    alert("Check your email for the magic link to sign in.");
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl">
@@ -31,26 +40,32 @@ export const Header = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <SignedIn>
-            <Link to="/dashboard">
-              <Button variant="ghost" size="sm" className="hidden md:inline-flex">
-                Dashboard
-              </Button>
-            </Link>
-            <UserButton />
-          </SignedIn>
-          <SignedOut>
-            <SignInButton mode="modal">
-              <Button variant="ghost" size="sm" className="hidden md:inline-flex">
+          {session ? (
+            <>
+              <Link to="/dashboard">
+                <Button variant="ghost" size="sm" className="hidden md:inline-flex">
+                  Dashboard
+                </Button>
+              </Link>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground hidden sm:inline-block">
+                  {user?.email || "Signed in"}
+                </span>
+                <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sign out">
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" className="hidden md:inline-flex" onClick={handleSignIn}>
                 Sign In
               </Button>
-            </SignInButton>
-            <SignInButton mode="modal">
-              <Button size="sm" className="hidden md:inline-flex">
+              <Button size="sm" className="hidden md:inline-flex" onClick={handleSignIn}>
                 Get Started
               </Button>
-            </SignInButton>
-          </SignedOut>
+            </>
+          )}
 
           {/* Mobile Menu Toggle */}
           <Button
@@ -90,10 +105,18 @@ export const Header = () => {
               FAQ
             </a>
             <div className="pt-3 space-y-2">
-              <Button variant="ghost" className="w-full">
-                Sign In
-              </Button>
-              <Button className="w-full">Get Started</Button>
+              {session ? (
+                <Button variant="ghost" className="w-full" onClick={signOut}>
+                  Sign Out
+                </Button>
+              ) : (
+                <>
+                  <Button variant="ghost" className="w-full" onClick={handleSignIn}>
+                    Sign In
+                  </Button>
+                  <Button className="w-full" onClick={handleSignIn}>Get Started</Button>
+                </>
+              )}
             </div>
           </div>
         </div>

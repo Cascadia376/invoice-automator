@@ -1,9 +1,11 @@
-import { Home, Upload, FileText, Settings } from "lucide-react";
+import { Home, Upload, Settings } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { UserButton, OrganizationSwitcher } from "@clerk/clerk-react";
+import { useAuth } from "@/context/AuthContext";
+import { Button } from "@/components/ui/button";
 
 export function AppHeader() {
+    const { user, signOut } = useAuth();
     const navItems = [
         { icon: Home, label: "Dashboard", href: "/dashboard" },
         { icon: Upload, label: "Upload", href: "/upload" },
@@ -17,17 +19,6 @@ export function AppHeader() {
                     <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
                         InvoiceZen
                     </h2>
-                    <OrganizationSwitcher
-                        afterCreateOrganizationUrl="/dashboard"
-                        afterLeaveOrganizationUrl="/dashboard"
-                        afterSelectOrganizationUrl="/dashboard"
-                        appearance={{
-                            elements: {
-                                rootBox: "flex items-center",
-                                organizationSwitcherTrigger: "flex items-center gap-2 px-3 py-2 rounded-md hover:bg-muted/50 transition-colors"
-                            }
-                        }}
-                    />
 
                     <nav className="hidden md:flex items-center gap-1">
                         {navItems.map((item) => (
@@ -51,7 +42,12 @@ export function AppHeader() {
                 </div>
 
                 <div className="flex items-center gap-4">
-                    <UserButton afterSignOutUrl="/" />
+                    <span className="text-sm text-muted-foreground hidden sm:inline-block">
+                        {user?.email || "Signed in"}
+                    </span>
+                    <Button variant="outline" size="sm" onClick={signOut}>
+                        Sign out
+                    </Button>
                 </div>
             </div>
         </header>

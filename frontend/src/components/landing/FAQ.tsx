@@ -24,7 +24,7 @@ const faqs = [
   {
     question: "Which accounting software do you integrate with?",
     answer:
-      "Currently QuickBooks Online, Xero, and FreshBooks. We're adding more integrations based on customer feedback. Check our roadmap for upcoming integrations.",
+      "The current build focuses on export-ready data. Use CSV exports or your own API bridge to drop data into your accounting stack.",
   },
   {
     question: "What file formats do you support?",

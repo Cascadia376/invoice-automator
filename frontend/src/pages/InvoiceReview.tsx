@@ -23,11 +23,13 @@ import { KeyboardShortcutsDialog } from "@/components/ui/keyboard-shortcuts-dial
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { useLocalDraft } from "@/hooks/useLocalDraft";
+import { useAuth } from "@/context/AuthContext";
 
 export default function InvoiceReview() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getInvoice, updateInvoice, pushToQBO, invoices, isLoading } = useInvoice();
+  const { getInvoice, updateInvoice, invoices, isLoading } = useInvoice();
+  const { getToken } = useAuth();
   const [invoice, setInvoice] = useState<Invoice | undefined>(undefined);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -59,11 +61,11 @@ export default function InvoiceReview() {
         // Fetch data with proper auth
         (async () => {
           try {
-            const token = await (window as any).Clerk?.session?.getToken();
+            const token = await getToken();
 
             // Fetch highlights
             fetch(`${API_BASE}/api/invoices/${id}/highlights`, {
-              headers: { 'Authorization': `Bearer ${token}` }
+              headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
             })
               .then(res => res.json())
               .then(data => setHighlights(data))
@@ -71,7 +73,7 @@ export default function InvoiceReview() {
 
             // Fetch Smart Validation
             fetch(`${API_BASE}/api/invoices/${id}/validate`, {
-              headers: { 'Authorization': `Bearer ${token}` }
+              headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
             })
               .then(res => res.json())
               .then(data => setValidationWarnings(data))
@@ -126,7 +128,7 @@ export default function InvoiceReview() {
           steps: [
             { element: '#pdf-panel', popover: { title: 'The Source', description: 'This is the original invoice PDF. You can zoom, pan, or pop it out.' } },
             { element: '#tour-data-panel', popover: { title: 'The Data (Truth Ray)', description: 'Here is the data extracted by AI. Click on any field (like Total Amount) to see a yellow box light up on the PDF showing exactly where it came from.' } },
-            { element: '#tour-actions', popover: { title: 'Take Action', description: 'When you are happy with the data, click Approve to sync it to QuickBooks instantly.' } }
+            { element: '#tour-actions', popover: { title: 'Take Action', description: 'When you are happy with the data, approve it to move the invoice forward.' } }
           ],
           onDestroyStarted: () => {
             if (!driverObj.hasNextStep()) {
@@ -282,25 +284,12 @@ export default function InvoiceReview() {
               </button>
               <button
                 onClick={async () => {
-                  try {
-                    await pushToQBO(invoice.id);
-                  } catch (error) {
-                    console.error(error);
-                  }
-                }}
-                className="px-4 py-2 text-sm font-medium text-white border border-transparent rounded-lg bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary flex items-center gap-2"
-                type="button"
-              >
-                Export to QBO
-              </button>
-              <button
-                onClick={async () => {
                   const savedColumns = localStorage.getItem("csv_export_columns");
                   const savedConfig = localStorage.getItem("csv_export_config");
 
                   const API_BASE = import.meta.env.PROD ? 'https://invoice-processor-backend.onrender.com' : 'http://localhost:8000';
                   // Token is already awaited due to 'await' keyword but verify context
-                  const token = await (window as any).Clerk?.session?.getToken();
+                  const token = await getToken();
 
                   let url = `${API_BASE}/api/invoices/${invoice.id}/export/csv`;
 
@@ -320,7 +309,7 @@ export default function InvoiceReview() {
 
                   try {
                     const response = await fetch(url, {
-                      headers: { Authorization: `Bearer ${token}` }
+                      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
                     });
 
                     if (!response.ok) throw new Error('Export failed');

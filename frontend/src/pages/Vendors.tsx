@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Building2, Search, TrendingUp, FileText, AlertCircle } from 'lucide-react';
 import { Vendor } from '@/types/vendor';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 
 const API_BASE = import.meta.env.PROD
     ? 'https://invoice-processor-backend.onrender.com'
@@ -17,6 +18,7 @@ export default function Vendors() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const navigate = useNavigate();
+    const { getToken } = useAuth();
 
     useEffect(() => {
         fetchVendors();
@@ -24,9 +26,9 @@ export default function Vendors() {
 
     const fetchVendors = async () => {
         try {
-            const token = await (window as any).Clerk?.session?.getToken();
+            const token = await getToken();
             const response = await fetch(`${API_BASE}/api/vendors`, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
             });
 
             if (response.ok) {

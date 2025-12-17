@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth } from "@/context/AuthContext";
 import { Invoice, DashboardStats, GLCategory } from '@/types/invoice';
 import { toast } from 'sonner';
 
@@ -10,7 +10,6 @@ interface InvoiceContextType {
     getInvoice: (id: string) => Invoice | undefined;
     updateInvoice: (id: string, data: Partial<Invoice>) => Promise<void>;
     uploadInvoice: (file: File) => Promise<void>;
-    pushToQBO: (id: string) => Promise<void>;
     deleteInvoice: (id: string) => void;
     refreshInvoices: () => Promise<void>;
     fetchGLCategories: () => Promise<void>;
@@ -26,7 +25,7 @@ const InvoiceContext = createContext<InvoiceContextType | undefined>(undefined);
 const API_URL = '/api';
 
 export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { getToken, orgId, userId } = useAuth();
+    const { getToken, orgId, user } = useAuth();
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [glCategories, setGlCategories] = useState<GLCategory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -46,7 +45,9 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 return;
             }
             const response = await fetch(`${API_URL}/invoices`, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                }
             });
             if (response.ok) {
                 const data = await response.json();
@@ -67,7 +68,9 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const token = await getToken();
             if (!token) return;
             const response = await fetch(`${API_URL}/gl-categories`, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                }
             });
             if (response.ok) {
                 const data = await response.json();
@@ -79,24 +82,24 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     useEffect(() => {
-        if (userId || orgId) {
+        if (user || orgId) {
             refreshInvoices();
             fetchGLCategories();
         }
-    }, [userId, orgId]);
+    }, [user, orgId]);
 
     // Calculate stats whenever invoices change
     useEffect(() => {
         const needsReview = invoices.filter(i => i.status === 'needs_review').length;
-        const pushed = invoices.filter(i => i.status === 'pushed').length;
+        const approved = invoices.filter(i => i.status === 'approved' || i.status === 'pushed').length;
         const total = invoices.length;
         // Mock calculation: 15 mins saved per pushed invoice
-        const hoursSaved = ((pushed * 15) / 60).toFixed(1);
+        const hoursSaved = ((approved * 15) / 60).toFixed(1);
 
         setStats({
             totalInvoices: total,
             needsReview,
-            pushed,
+            pushed: approved,
             timeSaved: `${hoursSaved}h`
         });
     }, [invoices]);
@@ -119,7 +122,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
                 },
                 body: JSON.stringify(data),
             });
@@ -159,11 +162,11 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
         try {
             const token = await getToken();
-            const response = await fetch(`${API_URL}/invoices/upload`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}` },
-                body: formData,
-            });
+                const response = await fetch(`${API_URL}/invoices/upload`, {
+                    method: 'POST',
+                    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                    body: formData,
+                });
 
             if (response.ok) {
                 const newInvoice = await response.json();
@@ -180,44 +183,12 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
     };
 
-    const pushToQBO = async (id: string) => {
-        // Optimistic Update
-        const previousInvoices = [...invoices];
-        setInvoices(prev => prev.map(inv =>
-            inv.id === id ? { ...inv, status: 'pushed' } : inv
-        ));
-
-        try {
-            const token = await getToken();
-            const response = await fetch(`${API_URL}/invoices/${id}/push`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}` },
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                // Keep the 'pushed' status (or update with full server response if needed)
-                toast.success(data.message || "Successfully exported to QuickBooks Online");
-            } else {
-                // Revert
-                setInvoices(previousInvoices);
-                const errorData = await response.json().catch(() => ({}));
-                toast.error(errorData.detail || "Failed to export to QuickBooks");
-            }
-        } catch (error) {
-            // Revert
-            setInvoices(previousInvoices);
-            console.error(error);
-            toast.error("Network error exporting to QBO");
-        }
-    };
-
     const deleteInvoice = async (id: string) => {
         try {
             const token = await getToken();
             const response = await fetch(`${API_URL}/invoices/${id}`, {
                 method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             });
 
             if (response.ok) {
@@ -239,7 +210,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
                 },
                 body: JSON.stringify(category),
             });
@@ -261,7 +232,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
                 },
                 body: JSON.stringify(category),
             });
@@ -281,7 +252,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const token = await getToken();
             const response = await fetch(`${API_URL}/gl-categories/${id}`, {
                 method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             });
             if (response.ok) {
                 setGlCategories(prev => prev.filter(c => c.id !== id));
@@ -297,7 +268,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         try {
             const token = await getToken();
             const response = await fetch(`${API_URL}/sku-mappings/${sku}`, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
             });
             if (response.ok) {
                 const data = await response.json();
@@ -317,7 +288,6 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             getInvoice,
             updateInvoice,
             uploadInvoice,
-            pushToQBO,
             deleteInvoice,
             refreshInvoices,
             fetchGLCategories,

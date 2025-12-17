@@ -1,73 +1,54 @@
-# Welcome to your Lovable project
+# Invoice Automator
 
-## Project info
+FastAPI + React app for ingesting invoices, extracting structured data (Textract + LLM/templates), reviewing edits, and exporting CSVs. Supabase JWT auth supported; auth can be disabled for local setup.
 
-**URL**: https://lovable.dev/projects/a7fc6f58-329a-4b36-8950-5d72f9b59392
+## Principles
+- Security first: least-privilege AWS/IAM, no public buckets, and JWT-guarded APIs (bypass only for local dev).
+- Simple ops: no Docker required; native builds on Render/Vercel with minimal env needed.
+- Tenant isolation: every record keyed by `organization_id`; keep CORS scoped to your frontend in production.
 
-## How can I edit this code?
+## Stack
+- Backend: FastAPI, SQLAlchemy, Pydantic, AWS S3/Textract, OpenAI
+- Frontend: React (Vite/TS), shadcn UI, Tailwind
+- Auth: Supabase JWT (optional bypass via `DISABLE_AUTH`/`VITE_DISABLE_AUTH`)
 
-There are several ways of editing your application.
+## Prereqs
+- Python 3.10+
+- Node 18+ / npm
+- AWS creds for S3/Textract (or stub storage for local)
+- Supabase project (URL, anon key, JWT secret) if enabling auth
 
-**Use Lovable**
+## Backend setup
+```bash
+cd backend
+python -m venv .venv && .venv\Scripts\activate  # or source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+Env (set in shell or `.env`):
+- `DATABASE_URL` (sqlite default works)
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_BUCKET_NAME`, `AWS_REGION`
+- `OPENAI_API_KEY`
+- `SUPABASE_JWT_SECRET` (and `SUPABASE_JWT_AUD` if non-default)
+- `SERVICE_API_KEY` (optional for scripts)
+- `DISABLE_AUTH=true` to bypass auth locally
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/a7fc6f58-329a-4b36-8950-5d72f9b59392) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+## Frontend setup
+```bash
+cd frontend
+npm install
 npm run dev
 ```
+Env (`frontend/.env`):
+- `VITE_API_BASE` (e.g., http://localhost:8000 or Render URL; defaults to same-origin `/api`)
+- `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+- `VITE_DISABLE_AUTH=true` to bypass auth locally
 
-**Edit a file directly in GitHub**
+## Deploy targets
+- Frontend: Vercel (root `frontend`, build `npm run build`, output `dist`)
+- Backend: Render web service (root `backend`, build `./build.sh`, start `uvicorn main:app --host 0.0.0.0 --port $PORT`)
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/a7fc6f58-329a-4b36-8950-5d72f9b59392) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Notes
+- QBO/Stripe integrations removed.
+- CSV export available at `/api/invoices/{id}/export/csv` with optional column mapping.
+- Demo data: `POST /api/seed/demo` (auth required unless bypass enabled).

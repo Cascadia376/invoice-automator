@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, FileText, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Vendor, VendorCorrection } from '@/types/vendor';
+import { useAuth } from '@/context/AuthContext';
 
 const API_BASE = import.meta.env.PROD
     ? 'https://invoice-processor-backend.onrender.com'
@@ -15,6 +16,7 @@ const API_BASE = import.meta.env.PROD
 export default function VendorDetail() {
     const { vendorId } = useParams();
     const navigate = useNavigate();
+    const { getToken } = useAuth();
     const [vendor, setVendor] = useState<Vendor | null>(null);
     const [corrections, setCorrections] = useState<VendorCorrection[]>([]);
     const [loading, setLoading] = useState(true);
@@ -28,9 +30,9 @@ export default function VendorDetail() {
 
     const fetchVendor = async () => {
         try {
-            const token = await (window as any).Clerk?.session?.getToken();
+            const token = await getToken();
             const response = await fetch(`${API_BASE}/api/vendors/${vendorId}`, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
             });
 
             if (response.ok) {
@@ -46,9 +48,9 @@ export default function VendorDetail() {
 
     const fetchCorrections = async () => {
         try {
-            const token = await (window as any).Clerk?.session?.getToken();
+            const token = await getToken();
             const response = await fetch(`${API_BASE}/api/vendors/${vendorId}/corrections`, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
             });
 
             if (response.ok) {

@@ -15,7 +15,7 @@ const features = [
   {
     icon: RefreshCw,
     title: "Direct Integration",
-    description: "Push to QuickBooks, Xero, or your ERP with one click. No exports, no imports.",
+    description: "Export clean CSVs or drop into your own pipeline with a single click.",
   },
   {
     icon: Lock,

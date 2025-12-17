@@ -1,12 +1,9 @@
 import os
 import jwt
-import requests
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Optional
-from jwt.algorithms import RSAAlgorithm
-import json
 
 class UserContext(BaseModel):
     user_id: str
@@ -21,27 +18,17 @@ async def get_api_key(x_api_key: Optional[str] = Header(None)):
     return x_api_key
 
 
-# Cache for JWKS
-jwks_cache = {}
-
-def get_jwks(issuer_url: str):
-    if issuer_url in jwks_cache:
-        return jwks_cache[issuer_url]
-    
-    try:
-        response = requests.get(f"{issuer_url}/.well-known/jwks.json")
-        response.raise_for_status()
-        jwks = response.json()
-        jwks_cache[issuer_url] = jwks
-        return jwks
-    except Exception as e:
-        print(f"Error fetching JWKS: {e}")
-        return None
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
+SUPABASE_JWT_AUD = os.getenv("SUPABASE_JWT_AUD", "authenticated")
+DISABLE_AUTH = os.getenv("DISABLE_AUTH", "").lower() == "true"
 
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     x_api_key: Optional[str] = Header(None)
 ) -> UserContext:
+    # Temporary dev bypass
+    if DISABLE_AUTH:
+        return UserContext(user_id="dev-user", org_id="dev-org", email="dev@example.com")
     
     # 1. Check for Service API Key (for Scripts/Folder Sync)
     service_api_key = os.getenv("SERVICE_API_KEY")
@@ -53,7 +40,7 @@ async def get_current_user(
             email="service@bot"
         )
 
-    # 2. Check for Clerk JWT
+    # 2. Check for Supabase JWT
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -61,64 +48,32 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     token = credentials.credentials
-    issuer_url = os.getenv("CLERK_ISSUER_URL")
-    
-    # ... rest of JWT logic ...
-    
-    print(f"AUTH DEBUG: Received token (len={len(token)})")
-    print(f"AUTH DEBUG: Issuer URL: {issuer_url}")
-
-    if not issuer_url:
-        print("AUTH ERROR: CLERK_ISSUER_URL is missing!")
+    if not SUPABASE_JWT_SECRET:
+        print("AUTH ERROR: SUPABASE_JWT_SECRET is missing!")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="CLERK_ISSUER_URL not configured"
+            detail="SUPABASE_JWT_SECRET not configured"
         )
 
     try:
-        # Get Key ID (kid) from header
-        header = jwt.get_unverified_header(token)
-        kid = header.get("kid")
-        
-        # Fetch JWKS and find the key
-        jwks = get_jwks(issuer_url)
-        if not jwks:
-             print("AUTH ERROR: Could not fetch JWKS")
-             raise HTTPException(status_code=500, detail="Could not fetch JWKS")
-             
-        public_key = None
-        for key in jwks["keys"]:
-            if key["kid"] == kid:
-                public_key = RSAAlgorithm.from_jwk(json.dumps(key))
-                break
-        
-        if not public_key:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token key ID"
-            )
-
-        # Decode and Validate
+        options = {"verify_aud": bool(SUPABASE_JWT_AUD)}
         payload = jwt.decode(
             token,
-            public_key,
-            algorithms=["RS256"],
-            issuer=issuer_url,
-            options={"verify_aud": False} 
+            SUPABASE_JWT_SECRET,
+            algorithms=["HS256"],
+            audience=SUPABASE_JWT_AUD if SUPABASE_JWT_AUD else None,
+            options=options
         )
         
-        # Extract Context
         user_id = payload.get("sub")
-        org_id = payload.get("org_id")
+        org_id = payload.get("org_id") or payload.get("organization_id") or user_id
+        email = payload.get("email") or payload.get("user_metadata", {}).get("email")
         
-        if not org_id:
-             org_id = user_id
-
         print(f"AUTH SUCCESS: User={user_id}, Org={org_id}")
         return UserContext(
             user_id=user_id,
             org_id=org_id,
-            email=payload.get("email")
+            email=email
         )
 
     except jwt.ExpiredSignatureError:

@@ -50,7 +50,6 @@ def migrate():
             "invoices", 
             "gl_categories", 
             "sku_category_mappings", 
-            "qbo_credentials", 
             "templates"
         ]
         

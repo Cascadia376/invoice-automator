@@ -65,17 +65,6 @@ class SKUCategoryMapping(Base):
     usage_count = Column(Integer, default=1)
     last_used = Column(DateTime, default=datetime.utcnow)
 
-class QBOCredentials(Base):
-    __tablename__ = "qbo_credentials"
-
-    realm_id = Column(String, primary_key=True, index=True)
-    organization_id = Column(String, index=True, nullable=False)
-    access_token = Column(String)
-    refresh_token = Column(String)
-    access_token_expires_at = Column(DateTime)
-    refresh_token_expires_at = Column(DateTime)
-    updated_at = Column(DateTime, default=datetime.utcnow)
-
 class Template(Base):
     __tablename__ = "templates"
 
@@ -90,7 +79,6 @@ class Organization(Base):
 
     id = Column(String, primary_key=True, index=True)
     name = Column(String)
-    stripe_customer_id = Column(String, index=True, nullable=True)
     subscription_status = Column(String, default="free") # free, active, past_due
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -135,4 +123,3 @@ class VendorCorrection(Base):
     rule = Column(String, nullable=True)  # e.g., "deposit = subtotal * 0.05"
     created_at = Column(DateTime, default=datetime.utcnow)
     created_by = Column(String, nullable=True)  # user_id
-
