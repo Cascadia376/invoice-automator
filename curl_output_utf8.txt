@@ -1,0 +1,86 @@
+﻿curl.exe :   % Total    % Received % Xferd  Average Speed   Time    Time 
+    Time  Current
+At line:1 char:1
++ curl.exe -v -X OPTIONS -H "Origin: https://cascadia-invoice-automator 
+...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (  % Total    % ...  Time  C 
+   urrent:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+                                 Dload  Upload   Total   Spent    Left  
+Speed
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:-- 
+    0* Host invoice-backend-a1gb.onrender.com:443 was resolved.
+* IPv6: (none)
+* IPv4: 216.24.57.7, 216.24.57.251
+*   Trying 216.24.57.7:443...
+* schannel: disabled automatic use of client certificate
+* ALPN: curl offers http/1.1
+* ALPN: server accepted http/1.1
+* Established connection to invoice-backend-a1gb.onrender.com 
+(216.24.57.7 port 443) from 192.168.0.105 port 64874 
+* using HTTP/1.x
+> OPTIONS /api/invoices HTTP/1.1
+
+> Host: invoice-backend-a1gb.onrender.com
+
+> User-Agent: curl/8.16.0
+
+> Accept: */*
+
+> Origin: https://cascadia-invoice-automator.vercel.app
+
+> Access-Control-Request-Method: GET
+
+> 
+
+* Request completely sent off
+* schannel: remote party requests renegotiation
+* schannel: renegotiating SSL/TLS connection
+* schannel: SSL/TLS connection renegotiated
+< HTTP/1.1 200 OK
+
+< Date: Wed, 17 Dec 2025 22:32:11 GMT
+
+< Content-Type: text/plain; charset=utf-8
+
+< Transfer-Encoding: chunked
+
+< Connection: keep-alive
+
+< CF-RAY: 9af9dffd08922a18-YVR
+
+< access-control-allow-credentials: true
+
+< access-control-allow-methods: DELETE, GET, HEAD, OPTIONS, PATCH, POST, 
+PUT
+
+< access-control-allow-origin: 
+https://cascadia-invoice-automator.vercel.app
+
+< access-control-max-age: 600
+
+< rndr-id: ab2e29c6-d4bd-47c8
+
+< vary: Origin
+
+< vary: Accept-Encoding
+
+< x-render-origin-server: uvicorn
+
+< cf-cache-status: DYNAMIC
+
+< Server: cloudflare
+
+< alt-svc: h3=":443"; ma=86400
+
+< 
+
+{ [7 bytes data]
+
+100     2    0     2    0     0     14      0 --:--:-- --:--:-- --:--:-- 
+   14
+* Connection #0 to host invoice-backend-a1gb.onrender.com:443 left intact
+OK
