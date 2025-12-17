@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -24,6 +24,7 @@ export function PDFViewer({ pdfUrl, highlights = [] }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [scale, setScale] = useState<number>(1.0);
+  const [rotation, setRotation] = useState<number>(0);
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
@@ -37,6 +38,7 @@ export function PDFViewer({ pdfUrl, highlights = [] }: PDFViewerProps) {
   const nextPage = () => changePage(1);
   const zoomIn = () => setScale((prev) => Math.min(prev + 0.2, 2.0));
   const zoomOut = () => setScale((prev) => Math.max(prev - 0.2, 0.6));
+  const rotate = () => setRotation((prev) => (prev + 90) % 360);
 
   return (
     <Card className="flex flex-col h-full bg-card">
@@ -73,6 +75,10 @@ export function PDFViewer({ pdfUrl, highlights = [] }: PDFViewerProps) {
           <Button variant="outline" size="sm" onClick={zoomIn}>
             <ZoomIn className="h-4 w-4" />
           </Button>
+          <div className="h-4 w-[1px] bg-border mx-1" />
+          <Button variant="outline" size="sm" onClick={rotate} title="Rotate 90°">
+            <RotateCw className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -96,6 +102,7 @@ export function PDFViewer({ pdfUrl, highlights = [] }: PDFViewerProps) {
             <Page
               pageNumber={pageNumber}
               scale={scale}
+              rotate={rotation}
               renderTextLayer={true}
               renderAnnotationLayer={true}
               className="shadow-lg relative"
