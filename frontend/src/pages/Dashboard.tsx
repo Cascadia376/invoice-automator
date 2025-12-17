@@ -21,7 +21,8 @@ export default function Dashboard() {
         const matchesStatus =
             statusFilter === 'all' ||
             invoice.status === statusFilter ||
-            (statusFilter === 'approved' && invoice.status === 'pushed'); // legacy "pushed" treated as approved
+            (statusFilter === 'approved' && invoice.status === 'pushed') ||
+            (statusFilter === ('issue' as any) && !!invoice.issueType);
 
         return matchesSearch && matchesStatus;
     });
@@ -44,7 +45,11 @@ export default function Dashboard() {
         .filter(i => i.status === 'approved')
         .reduce((sum, i) => sum + i.totalAmount, 0);
 
-    const maxAmount = Math.max(pendingAmount, approvedAmount, 1); // Avoid div by 0
+    const issueAmount = invoices
+        .filter(i => !!i.issueType)
+        .reduce((sum, i) => sum + i.totalAmount, 0);
+
+    const maxAmount = Math.max(pendingAmount, approvedAmount, issueAmount, 1); // Avoid div by 0
 
     const toggleSelectAll = () => {
         if (selectedIds.size === filteredInvoices.length) {
@@ -170,19 +175,30 @@ export default function Dashboard() {
             </div>
 
             <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-4">
-                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+                <div
+                    onClick={() => {
+                        // In a real app we'd filter by issueType. 
+                        // For now we'll just search for common issue keywords or filter if we have the field.
+                        setSearchTerm("issue");
+                    }}
+                    className="cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md"
+                >
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-500">Total Overdue</p>
-                            <p className="mt-2 text-3xl font-bold text-gray-900">$0.00</p>
+                            <p className="text-sm font-medium text-gray-500">Issue Tracker</p>
+                            <p className="mt-2 text-3xl font-bold text-gray-900">
+                                {invoices.filter(i => !!i.issueType).length}
+                            </p>
                         </div>
                         <div className="rounded-full bg-red-50 p-3">
                             <AlertCircle className="h-6 w-6 text-red-500" />
                         </div>
                     </div>
                     <div className="mt-4 flex items-center text-sm text-red-600">
-                        <span className="font-medium">0 invoices</span>
-                        <span className="ml-2 text-gray-400">• Past due</span>
+                        <span className="font-medium">
+                            {invoices.filter(i => !!i.issueType).length} items
+                        </span>
+                        <span className="ml-2 text-gray-400">• Needs resolution</span>
                     </div>
                 </div>
 
@@ -243,9 +259,9 @@ export default function Dashboard() {
                         </div>
                         <div className="flex flex-col items-center gap-2 flex-1">
                             <div className="w-full rounded-t-md bg-red-500/10 h-full relative group">
-                                <div className="absolute bottom-0 w-full rounded-t-md bg-danger transition-all duration-500 group-hover:bg-red-600" style={{ height: "4px" }}></div>
+                                <div className="absolute bottom-0 w-full rounded-t-md bg-danger transition-all duration-500 group-hover:bg-red-600" style={{ height: `${(issueAmount / maxAmount) * 100}%`, minHeight: '4px' }}></div>
                             </div>
-                            <span className="text-xs font-medium text-gray-600">Overdue</span>
+                            <span className="text-xs font-medium text-gray-600">Issues</span>
                         </div>
                     </div>
                 </div>
@@ -276,6 +292,12 @@ export default function Dashboard() {
                         className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === 'failed' ? 'bg-white text-danger shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                         Rejected
+                    </button>
+                    <button
+                        onClick={() => setStatusFilter('issue' as any)}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === ('issue' as any) ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Issues
                     </button>
                 </div>
 
@@ -378,6 +400,11 @@ export default function Dashboard() {
                                             {invoice.status === 'failed' && (
                                                 <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
                                                     <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-red-500"></span>Rejected
+                                                </span>
+                                            )}
+                                            {invoice.issueType && (
+                                                <span className="ml-2 inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800 border border-orange-200">
+                                                    {invoice.issueType}
                                                 </span>
                                             )}
                                         </td>

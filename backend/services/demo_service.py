@@ -143,6 +143,7 @@ def seed_demo_data(db: Session, org_id: str) -> models.Invoice:
         discount_amount=0,
         currency="USD",
         status="needs_review", # User needs to review it
+        issue_type=None,
         file_url=rel_path
     )
     

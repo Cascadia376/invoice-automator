@@ -23,6 +23,7 @@ class Invoice(Base):
     currency = Column(String, default="USD")
     po_number = Column(String, nullable=True)
     status = Column(String, default="ingested")
+    issue_type = Column(String, nullable=True) # breakage, shortship, overship, misship
     file_url = Column(String, nullable=True)
     vendor_id = Column(String, ForeignKey("vendors.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

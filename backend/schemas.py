@@ -51,6 +51,7 @@ class InvoiceBase(BaseModel):
     po_number: Optional[str] = None
     status: str
     file_url: Optional[str] = None
+    issue_type: Optional[str] = None
 
     @validator('invoice_number', 'vendor_name', pre=True, check_fields=False)
     def ensure_string(cls, v):
@@ -79,6 +80,8 @@ class InvoiceUpdate(BaseModel):
     currency: Optional[str] = None
     po_number: Optional[str] = None
     status: Optional[str] = None
+    deposit_amount: Optional[float] = None
+    issue_type: Optional[str] = None
     line_items: Optional[List[LineItemBase]] = None
 
     class Config:

@@ -56,6 +56,7 @@ const invoiceSchema = z.object({
   depositAmount: z.coerce.number().min(0).optional(),
   totalAmount: z.coerce.number().min(0, "Total required"),
   currency: z.string().min(1, "Currency required"),
+  issueType: z.enum(['breakage', 'shortship', 'overship', 'misship']).nullable().optional(),
   lineItems: z.array(lineItemSchema),
 });
 
@@ -159,6 +160,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
       depositAmount: data.depositAmount || 0,
       totalAmount: data.totalAmount,
       currency: data.currency,
+      issueType: data.issueType || null,
       lineItems: (data.lineItems || []).map(item => ({
         sku: item.sku || '',
         description: item.description,
@@ -190,6 +192,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
       depositAmount: data.depositAmount || 0,
       totalAmount: data.totalAmount,
       currency: data.currency,
+      issueType: data.issueType || null,
       lineItems: (data.lineItems || []).map(item => ({
         sku: item.sku || '',
         description: item.description,
@@ -268,7 +271,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
   const deposit = watch("depositAmount") || 0;
   const total = watch("totalAmount") || 0;
 
-  const calculatedTotal = subtotal + tax + shipping - discount;
+  const calculatedTotal = subtotal + tax + shipping + deposit - discount;
   const totalMismatch = Math.abs(calculatedTotal - total) > 0.05;
 
   const lineItemsSum = lineItems.reduce((sum, item) => sum + (item.amount || 0), 0);
@@ -363,6 +366,20 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                 <div>
                   <Label htmlFor="currency" className="text-xs">Currency</Label>
                   <Input id="currency" {...register("currency")} className="mt-1 h-8 text-sm" onFocus={() => onFieldFocus?.("currency")} />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="issueType" className="text-xs">Invoice Issue (if any)</Label>
+                  <select
+                    id="issueType"
+                    {...register("issueType")}
+                    className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <option value="">No Issue</option>
+                    <option value="breakage">Breakage</option>
+                    <option value="shortship">Shortship</option>
+                    <option value="overship">Overship</option>
+                    <option value="misship">Mis-ship</option>
+                  </select>
                 </div>
               </div>
             </div>

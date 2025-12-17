@@ -1,4 +1,4 @@
-import { Home, Upload, FileText, Settings, LogOut } from "lucide-react";
+import { Home, Upload, FileText, Settings, LogOut, Building2, BarChart3 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 export function AppSidebar() {
     const navItems = [
         { icon: Home, label: "Dashboard", href: "/dashboard" },
-        { icon: FileText, label: "Invoices", href: "/invoices" },
         { icon: Upload, label: "Upload", href: "/upload" },
+        { icon: BarChart3, label: "Reconciliation", href: "/reconcile" },
+        { icon: Building2, label: "Vendors", href: "/vendors" },
         { icon: Settings, label: "Settings", href: "/settings" },
     ];
 

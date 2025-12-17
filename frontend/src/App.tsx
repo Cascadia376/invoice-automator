@@ -12,6 +12,7 @@ import InvoiceReview from "./pages/InvoiceReview";
 import Settings from "./pages/Settings";
 import Vendors from "./pages/Vendors";
 import VendorDetail from "./pages/VendorDetail";
+import MonthEndReconciliation from "./pages/MonthEndReconciliation";
 import NotFound from "./pages/NotFound";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 
@@ -59,6 +60,7 @@ const App = () => {
                     <Route path="/upload" element={<Upload />} />
                     <Route path="/invoices" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/vendors" element={<Vendors />} />
+                    <Route path="/reconcile" element={<MonthEndReconciliation />} />
                     <Route path="/settings" element={<Settings />} />
                   </Route>
                   <Route path="/invoices/:id" element={<InvoiceReview />} />

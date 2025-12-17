@@ -30,6 +30,7 @@ export interface Invoice {
   currency: string;
   poNumber?: string;
   status: InvoiceStatus;
+  issueType?: 'breakage' | 'shortship' | 'overship' | 'misship' | null;
   lineItems: LineItem[];
   fileUrl?: string;
   createdAt: string;
