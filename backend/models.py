@@ -24,6 +24,7 @@ class Invoice(Base):
     po_number = Column(String, nullable=True)
     status = Column(String, default="ingested")
     file_url = Column(String, nullable=True)
+    vendor_id = Column(String, ForeignKey("vendors.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     line_items = relationship("LineItem", back_populates="invoice", cascade="all, delete-orphan")

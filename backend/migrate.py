@@ -45,6 +45,14 @@ def migrate():
         except Exception as e:
             print(f"deposit_amount column might already exist or error: {e}")
 
+        try:
+            print("Adding vendor_id column...")
+            conn.execute(text("ALTER TABLE invoices ADD COLUMN vendor_id VARCHAR REFERENCES vendors(id)"))
+            conn.execute(text("CREATE INDEX ix_invoices_vendor_id ON invoices (vendor_id)"))
+            conn.commit()
+        except Exception as e:
+            print(f"vendor_id column might already exist or error: {e}")
+
         # Multi-tenancy migrations
         tables_to_migrate = [
             "invoices", 
