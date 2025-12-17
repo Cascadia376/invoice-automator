@@ -25,16 +25,16 @@ def generate_demo_pdf(output_path: str):
     page.insert_text((400, 100), f"Date: {datetime.now().strftime('%Y-%m-%d')}", fontsize=12)
     
     # Bill To
-    page.insert_text((50, 150), "BILL TO:", fontsize=12, style="bold")
+    page.insert_text((50, 150), "BILL TO:", fontsize=12, fontname="helv-bo")
     page.insert_text((50, 170), "Future Innovation Corp", fontsize=12)
     
     # Line Items Header
     y = 250
     page.draw_rect(fitz.Rect(50, y-20, 550, y), color=(0.9, 0.9, 0.9), fill=(0.9, 0.9, 0.9))
-    page.insert_text((60, y-5), "Description", fontsize=10, style="bold")
-    page.insert_text((350, y-5), "Qty", fontsize=10, style="bold")
-    page.insert_text((400, y-5), "Unit Price", fontsize=10, style="bold")
-    page.insert_text((480, y-5), "Amount", fontsize=10, style="bold")
+    page.insert_text((60, y-5), "Description", fontsize=10, fontname="helv-bo")
+    page.insert_text((350, y-5), "Qty", fontsize=10, fontname="helv-bo")
+    page.insert_text((400, y-5), "Unit Price", fontsize=10, fontname="helv-bo")
+    page.insert_text((480, y-5), "Amount", fontsize=10, fontname="helv-bo")
     
     # Items
     items = [
@@ -64,11 +64,11 @@ def generate_demo_pdf(output_path: str):
     page.insert_text((400, y), "Tax (0%):", fontsize=10)
     page.insert_text((480, y), "$0.00", fontsize=10)
     y += 20
-    page.insert_text((400, y), "TOTAL:", fontsize=12, style="bold")
-    page.insert_text((480, y), f"${total:,.2f}", fontsize=12, style="bold", color=(0, 0, 1))
+    page.insert_text((400, y), "TOTAL:", fontsize=12, fontname="helv-bo")
+    page.insert_text((480, y), f"${total:,.2f}", fontsize=12, fontname="helv-bo", color=(0, 0, 1))
     
     # Footer
-    page.insert_text((50, 750), "Payment due within 30 days. Thank you for your business.", fontsize=9, style="italic")
+    page.insert_text((50, 750), "Payment due within 30 days. Thank you for your business.", fontsize=9, fontname="helv-ob")
 
     doc.save(output_path)
     doc.close()
