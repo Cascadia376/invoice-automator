@@ -52,18 +52,17 @@ export default function InvoiceReview() {
   const pdfUrl = getPdfUrl();
   const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
 
+  // Main Data Load
   useEffect(() => {
     if (id) {
       const data = getInvoice(id);
       if (data) {
         setInvoice(data);
 
-        // Fetch data with proper auth
+        // Fetch highlights & validation
         (async () => {
           try {
             const token = await getToken();
-
-            // Fetch highlights
             fetch(`${API_BASE}/api/invoices/${id}/highlights`, {
               headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
             })
@@ -71,36 +70,16 @@ export default function InvoiceReview() {
               .then(data => setHighlights(data))
               .catch(err => console.error("Failed to load highlights", err));
 
-            // Fetch Smart Validation
             fetch(`${API_BASE}/api/invoices/${id}/validate`, {
               headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
             })
               .then(res => res.json())
               .then(data => setValidationWarnings(data))
               .catch(err => console.error("Failed to load validation", err));
-
           } catch (err) {
             console.error("Auth error", err);
           }
         })();
-
-        // Check for local draft
-        if (hasDraft(id)) {
-          const draft = getDraft(id);
-          if (draft && draft.timestamp > new Date(data.updatedAt || 0).getTime()) {
-            toast("Unsaved changes found", {
-              description: "You have unsaved edits from a previous session.",
-              action: {
-                label: "Restore",
-                onClick: () => {
-                  setInvoice({ ...data, ...draft.data });
-                  toast.success("Draft restored");
-                }
-              },
-              duration: 8000,
-            });
-          }
-        }
       } else {
         if (!isLoading) {
           toast.error("Invoice not found");
@@ -108,7 +87,32 @@ export default function InvoiceReview() {
         }
       }
     }
-  }, [id, getInvoice, navigate, hasDraft, getDraft, isLoading]);
+  }, [id, getInvoice, navigate, isLoading]);
+
+  // Draft Check - Only on entry or ID change
+  useEffect(() => {
+    if (id) {
+      const data = getInvoice(id);
+      if (data && hasDraft(id)) {
+        const draft = getDraft(id);
+        const lastUpdate = new Date(data.updatedAt || 0).getTime();
+
+        if (draft && draft.timestamp > lastUpdate + 1000) { // Add 1s buffer
+          toast("Unsaved changes found", {
+            description: "You have unsaved edits from a previous session.",
+            action: {
+              label: "Restore",
+              onClick: () => {
+                setInvoice({ ...data, ...draft.data });
+                toast.success("Draft restored");
+              }
+            },
+            duration: 8000,
+          });
+        }
+      }
+    }
+  }, [id]); // ONLY ON ID CHANGE
 
   // Tour logic
   const tourStartedRef = useRef(false);

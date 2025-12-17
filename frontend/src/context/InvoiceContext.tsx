@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from "@/context/AuthContext";
 import { Invoice, DashboardStats, GLCategory } from '@/types/invoice';
 import { toast } from 'sonner';
@@ -36,7 +36,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         timeSaved: '0h'
     });
 
-    const refreshInvoices = async () => {
+    const refreshInvoices = useCallback(async () => {
         setIsLoading(true);
         try {
             const token = await getToken();
@@ -61,9 +61,9 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [getToken]);
 
-    const fetchGLCategories = async () => {
+    const fetchGLCategories = useCallback(async () => {
         try {
             const token = await getToken();
             if (!token) return;
@@ -79,7 +79,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         } catch (error) {
             console.error("Failed to fetch GL categories", error);
         }
-    };
+    }, [getToken]);
 
     useEffect(() => {
         if (user || orgId) {
@@ -104,12 +104,11 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
     }, [invoices]);
 
-    const getInvoice = (id: string) => invoices.find(i => i.id === id);
+    const getInvoice = useCallback((id: string) => invoices.find(i => i.id === id), [invoices]);
 
-    const updateInvoice = async (id: string, data: Partial<Invoice>) => {
+    const updateInvoice = useCallback(async (id: string, data: Partial<Invoice>) => {
         // Optimistic Update: Snapshot current state for rollback
         const previousInvoices = [...invoices];
-        const originalInvoice = invoices.find(i => i.id === id);
 
         // Apply update immediately
         setInvoices(prev => prev.map(inv =>
@@ -154,7 +153,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             setInvoices(previousInvoices);
             toast.error("Network error updating invoice");
         }
-    };
+    }, [invoices, getToken]);
 
     const uploadInvoice = async (file: File) => {
         const formData = new FormData();
