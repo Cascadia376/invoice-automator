@@ -12,7 +12,12 @@ export const Header = () => {
   const handleSignIn = async () => {
     const email = window.prompt("Enter your email to sign in with Supabase");
     if (!email) return;
-    await supabase.auth.signInWithOtp({ email });
+    await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    });
     alert("Check your email for the magic link to sign in.");
   };
 
