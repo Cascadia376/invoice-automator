@@ -61,7 +61,7 @@ export const Hero = () => {
             <div className="relative rounded-2xl overflow-hidden border border-border shadow-2xl hover-lift">
               <img
                 src={heroDashboard}
-                alt="InvoiceAI Dashboard"
+                alt="Cascadia Invoice Agent Dashboard"
                 className="w-full h-auto"
               />
             </div>

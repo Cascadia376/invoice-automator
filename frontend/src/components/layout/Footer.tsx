@@ -11,7 +11,7 @@ export const Footer = () => {
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-primary">
                 <FileText className="h-5 w-5 text-white" />
               </div>
-              <span className="font-semibold text-lg">InvoiceAI</span>
+              <span className="font-semibold text-lg">Cascadia Invoice Agent</span>
             </div>
             <p className="text-sm text-muted-foreground">
               Automate invoice processing with AI. Save hours every week.
@@ -86,7 +86,7 @@ export const Footer = () => {
         </div>
 
         <div className="mt-12 pt-8 border-t border-border/40 text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} InvoiceAI. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Cascadia Invoice Agent. All rights reserved.</p>
         </div>
       </div>
     </footer>

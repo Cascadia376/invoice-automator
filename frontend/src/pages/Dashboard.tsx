@@ -214,11 +214,11 @@ export default function Dashboard() {
                             <p className="text-sm font-medium text-gray-500">Processed (30d)</p>
                             <p className="mt-2 text-3xl font-bold text-gray-900">{stats.totalInvoices}</p>
                         </div>
-                        <div className="rounded-full bg-blue-50 p-3">
-                            <FileText className="h-6 w-6 text-blue-500" />
+                        <div className="rounded-full bg-primary/10 p-3">
+                            <FileText className="h-6 w-6 text-primary" />
                         </div>
                     </div>
-                    <div className="mt-4 flex items-center text-sm text-blue-600">
+                    <div className="mt-4 flex items-center text-sm text-primary">
                         <span className="font-medium">+12%</span>
                         <span className="ml-2 text-gray-400">from last month</span>
                     </div>
@@ -333,7 +333,7 @@ export default function Dashboard() {
                                             {!searchTerm && statusFilter === 'all' && (
                                                 <button
                                                     onClick={handleLoadDemo}
-                                                    className="mt-2 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-all"
+                                                    className="mt-2 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 transition-all font-sans"
                                                 >
                                                     <Beaker className="h-4 w-4" />
                                                     Load Demo Data

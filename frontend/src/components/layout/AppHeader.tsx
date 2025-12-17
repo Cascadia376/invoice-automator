@@ -16,8 +16,8 @@ export function AppHeader() {
         <header className="border-b bg-card sticky top-0 z-10">
             <div className="container mx-auto px-4 h-16 flex items-center justify-between max-w-7xl">
                 <div className="flex items-center gap-8">
-                    <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-                        InvoiceZen
+                    <h2 className="text-xl font-bold text-foreground">
+                        Cascadia Invoice Agent
                     </h2>
 
                     <nav className="hidden md:flex items-center gap-1">

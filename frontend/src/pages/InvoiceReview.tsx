@@ -253,7 +253,7 @@ export default function InvoiceReview() {
                 <div className="bg-primary p-1.5 rounded-lg flex items-center justify-center">
                   <FileText className="h-5 w-5 text-white" />
                 </div>
-                <span className="text-gray-900">InvoiceAI</span>
+                <span className="text-gray-900">Cascadia Invoice Agent</span>
               </div>
             </div>
             <div className="flex items-center gap-4">

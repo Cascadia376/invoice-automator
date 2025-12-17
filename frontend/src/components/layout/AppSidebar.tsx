@@ -14,8 +14,8 @@ export function AppSidebar() {
     return (
         <aside className="w-64 border-r bg-card hidden md:flex flex-col h-screen sticky top-0">
             <div className="p-6 border-b">
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-                    InvoiceZen
+                <h2 className="text-2xl font-bold text-foreground">
+                    Cascadia Invoice Agent
                 </h2>
             </div>
 
