@@ -21,6 +21,10 @@ def upload_file(file_path: str, object_name: str = None):
     if object_name is None:
         object_name = os.path.basename(file_path)
 
+    if not AWS_BUCKET_NAME:
+        print("WARNING: AWS_BUCKET_NAME not set. Skipping S3 upload.")
+        return False
+
     s3_client = get_s3_client()
     try:
         s3_client.upload_file(file_path, AWS_BUCKET_NAME, object_name)
@@ -28,6 +32,9 @@ def upload_file(file_path: str, object_name: str = None):
         return True
     except ClientError as e:
         print(f"Failed to upload file to S3: {e}")
+        return False
+    except Exception as e:
+        print(f"Unexpected error uploading to S3: {e}")
         return False
 
 def get_presigned_url(object_name: str, expiration=3600):
