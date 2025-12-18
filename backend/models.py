@@ -20,7 +20,7 @@ class Invoice(Base):
     discount_amount = Column(Float, default=0.0)
     tax_amount = Column(Float)
     deposit_amount = Column(Float, default=0.0)
-    currency = Column(String, default="USD")
+    currency = Column(String, default="CAD")
     po_number = Column(String, nullable=True)
     status = Column(String, default="ingested")
     issue_type = Column(String, nullable=True) # breakage, shortship, overship, misship

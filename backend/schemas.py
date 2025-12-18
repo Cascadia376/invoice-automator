@@ -47,7 +47,7 @@ class InvoiceBase(BaseModel):
     discount_amount: Optional[float] = 0.0
     tax_amount: float
     deposit_amount: Optional[float] = 0.0
-    currency: str
+    currency: str = "CAD"
     po_number: Optional[str] = None
     status: str
     file_url: Optional[str] = None

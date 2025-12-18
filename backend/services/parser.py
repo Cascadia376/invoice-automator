@@ -15,22 +15,8 @@ import models
 from services import textract_service
 
 def normalize_currency(currency: str) -> str:
-    """Normalize currency codes to ISO format."""
-    if not currency:
-        return "USD"
-    
-    curr = str(currency).upper().strip()
-    # Handle common extraction errors
-    if curr in ["$CA", "CA$", "CDN", "CAD$", "C$"]:
-        return "CAD"
-    if curr in ["$", "US$", "USD$", "U.S."]:
-        return "USD"
-    
-    # If it's 3 letters, assume it's ISO
-    if len(curr) == 3:
-        return curr
-        
-    return "USD" # Default
+    """Always return CAD for this implementation."""
+    return "CAD"
 
 def safe_float(value, default=0.0):
     """Safely convert value to float."""
@@ -211,7 +197,7 @@ fields:
   invoice_number: Invoice\\s+#(\\d+)
   date: Date\\s+(\\d{4}-\\d{2}-\\d{2})
 options:
-  currency: USD
+  currency: CAD
 """
 
         # Prepend system prompt to messages
@@ -329,7 +315,7 @@ def map_to_schema(data):
         "shipping_amount": float(data.get('shipping_amount', 0.0)),
         "discount_amount": safe_float(data.get('discount_amount')),
         "tax_amount": 0.0,
-        "currency": normalize_currency(data.get('currency')),
+        "currency": "CAD",
         "line_items": data.get('lines', []) # Map invoice2data 'lines' to our 'line_items'
     }
 
@@ -416,7 +402,7 @@ def empty_invoice_data():
         "date": datetime.now().strftime("%Y-%m-%d"),
         "total_amount": 0.0,
         "tax_amount": 0.0,
-        "currency": "USD",
+        "currency": "CAD",
         "line_items": []
     }
 
