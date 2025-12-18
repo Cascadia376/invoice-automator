@@ -6,7 +6,9 @@ import os
 from sqlalchemy import create_engine, text
 
 # Get DB URL from env
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./sql_app.db")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+default_db_path = os.path.join(BASE_DIR, "sql_app.db")
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{default_db_path}")
 
 # Fix for Render's Postgres URL
 if DATABASE_URL.startswith("postgres://"):
@@ -14,7 +16,7 @@ if DATABASE_URL.startswith("postgres://"):
 
 connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
 
-print(f"DATABASE CONNECTION: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else 'sqlite_local'}")
+print(f"DATABASE CONNECTION: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else 'sqlite_root'}")
 
 import models
 

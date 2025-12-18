@@ -28,6 +28,7 @@ async def get_current_user(
 ) -> UserContext:
     # Temporary dev bypass
     if DISABLE_AUTH:
+        print("AUTH: Dev Mode Bypass (DISABLE_AUTH=true). Context: dev@example.com / dev-org")
         return UserContext(user_id="dev-user", org_id="dev-org", email="dev@example.com")
     
     # 1. Check for Service API Key (for Scripts/Folder Sync)

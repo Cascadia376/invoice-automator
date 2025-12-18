@@ -13,6 +13,7 @@ import Settings from "./pages/Settings";
 import Vendors from "./pages/Vendors";
 import VendorDetail from "./pages/VendorDetail";
 import MonthEndReconciliation from "./pages/MonthEndReconciliation";
+import APSageView from "./pages/APSageView";
 import NotFound from "./pages/NotFound";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 
@@ -61,6 +62,7 @@ const App = () => {
                     <Route path="/invoices" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/vendors" element={<Vendors />} />
                     <Route path="/reconcile" element={<MonthEndReconciliation />} />
+                    <Route path="/ap-view" element={<APSageView />} />
                     <Route path="/settings" element={<Settings />} />
                   </Route>
                   <Route path="/invoices/:id" element={<InvoiceReview />} />

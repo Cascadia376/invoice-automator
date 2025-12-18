@@ -8,6 +8,7 @@ export function AppSidebar() {
         { icon: Home, label: "Dashboard", href: "/dashboard" },
         { icon: Upload, label: "Upload", href: "/upload" },
         { icon: BarChart3, label: "Reconciliation", href: "/reconcile" },
+        { icon: FileText, label: "AP Sage View", href: "/ap-view" },
         { icon: Building2, label: "Vendors", href: "/vendors" },
         { icon: Settings, label: "Settings", href: "/settings" },
     ];
