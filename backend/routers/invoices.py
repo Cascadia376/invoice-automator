@@ -89,19 +89,18 @@ async def upload_invoice(
             tax_amount=extracted_data.get("tax_amount", 0.0),
             deposit_amount=extracted_data.get("deposit_amount", 0.0),
             currency=extracted_data.get("currency", "CAD"),
+            po_number=extracted_data.get("po_number"),
             status="needs_review",
-            file_url=s3_key, # Store S3 key
+            file_url=s3_key,
             raw_extraction_results=extracted_data.get("raw_extraction_results"),
             vendor_id=vendor.id
         )
-        db.add(db_invoice)
-        db.commit()
-        db.refresh(db_invoice)
 
         # Save Line Items
         line_items_data = extracted_data.get("line_items", [])
+        print(f"DATABASE: Saving {len(line_items_data)} line items for invoice {file_id}")
+        
         for item in line_items_data:
-            # Check if we have a learned category for this SKU
             sku = item.get("sku")
             category_gl_code = item.get("category_gl_code")
             
@@ -111,32 +110,32 @@ async def upload_invoice(
                         models.SKUCategoryMapping.sku == sku,
                         models.SKUCategoryMapping.organization_id == ctx.org_id
                     ).order_by(models.SKUCategoryMapping.usage_count.desc()).first()
-                    
                     if mapping:
                         category_gl_code = mapping.category_gl_code
                 except Exception as e:
-                    print(f"WARNING: Could not look up SKU mapping: {e}")
+                    print(f"WARNING: SKU mapping lookup error: {e}")
             
             db_item = models.LineItem(
                 id=str(uuid.uuid4()), 
                 invoice_id=file_id, 
                 sku=sku,
                 description=item.get("description", "Item"),
-                units_per_case=safe_float(item.get("units_per_case", 1.0)),
-                cases=safe_float(item.get("cases", 0.0)),
-                quantity=safe_float(item.get("quantity", 1.0)),
-                unit_cost=safe_float(item.get("unit_cost", 0.0)),
-                amount=safe_float(item.get("amount", 0.0)),
+                units_per_case=parse_float(item.get("units_per_case", 1.0)),
+                cases=parse_float(item.get("cases", 0.0)),
+                quantity=parse_float(item.get("quantity", 1.0)),
+                unit_cost=parse_float(item.get("unit_cost", 0.0)),
+                amount=parse_float(item.get("amount", 0.0)),
                 category_gl_code=category_gl_code,
-                confidence_score=safe_float(item.get("confidence_score", 1.0))
+                confidence_score=parse_float(item.get("confidence_score", 1.0))
             )
-            db.add(db_item)
+            db_invoice.line_items.append(db_item)
         
-        print(f"COMMITTING: {len(line_items_data)} line items")
+        db.add(db_invoice)
         db.commit()
         db.refresh(db_invoice)
         
-        # Generate presigned URL for immediate display
+        print(f"SUCCESS: Invoice {file_id} saved with {len(db_invoice.line_items)} line items")
+
         if db_invoice.file_url and not db_invoice.file_url.startswith("http"):
              db_invoice.file_url = storage.get_presigned_url(db_invoice.file_url)
              
