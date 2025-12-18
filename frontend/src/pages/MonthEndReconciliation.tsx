@@ -97,7 +97,7 @@ export default function MonthEndReconciliation() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">
-                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalAmount)}
+                            {new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(totalAmount)}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
                             {reconciliationData.length} active vendors
@@ -153,7 +153,7 @@ export default function MonthEndReconciliation() {
                                         <TableCell className="font-semibold">{vendor.name}</TableCell>
                                         <TableCell className="text-right">{vendor.count}</TableCell>
                                         <TableCell className="text-right font-medium">
-                                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(vendor.total)}
+                                            {new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(vendor.total)}
                                         </TableCell>
                                         <TableCell>
                                             {vendor.approved === vendor.count ? (

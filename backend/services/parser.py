@@ -26,6 +26,7 @@ def safe_float(value, default=0.0):
         return float(value)
     except (ValueError, TypeError):
         return default
+def extract_invoice_data(file_path: str, org_id: str, s3_key: str = None, s3_bucket: str = None):
     """
     Hybrid extraction strategy:
     1. Try invoice2data with existing templates (Fast, Free, Deterministic)

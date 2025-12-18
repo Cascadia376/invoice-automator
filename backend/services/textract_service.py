@@ -184,7 +184,7 @@ def extract_invoice_with_textract(s3_bucket: str, s3_key: str) -> Optional[Dict]
             'deposit_amount': deposit_amount,
             'shipping_amount': 0.0,
             'discount_amount': 0.0,
-            'currency': 'USD',
+            'currency': 'CAD',
             'line_items': line_items
         }
         

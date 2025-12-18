@@ -364,8 +364,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                   <Input id="poNumber" {...register("poNumber")} className="mt-1 h-8 text-sm" />
                 </div>
                 <div>
-                  <Label htmlFor="currency" className="text-xs">Currency</Label>
-                  <Input id="currency" {...register("currency")} className="mt-1 h-8 text-sm" onFocus={() => onFieldFocus?.("currency")} />
+                  {/* Currency hidden as it is always CAD */}
                 </div>
                 <div className="col-span-2">
                   <Label htmlFor="issueType" className="text-xs">Invoice Issue (if any)</Label>

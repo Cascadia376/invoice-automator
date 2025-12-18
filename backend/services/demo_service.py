@@ -141,7 +141,7 @@ def seed_demo_data(db: Session, org_id: str) -> models.Invoice:
         shipping_amount=0,
         tax_amount=0,
         discount_amount=0,
-        currency="USD",
+        currency="CAD",
         status="needs_review", # User needs to review it
         issue_type=None,
         file_url=rel_path

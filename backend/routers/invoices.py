@@ -72,7 +72,7 @@ async def upload_invoice(
             discount_amount=extracted_data.get("discount_amount", 0.0),
             tax_amount=extracted_data.get("tax_amount", 0.0),
             deposit_amount=extracted_data.get("deposit_amount", 0.0),
-            currency=extracted_data.get("currency", "USD"),
+            currency=extracted_data.get("currency", "CAD"),
             status="needs_review",
             file_url=s3_key, # Store S3 key
             vendor_id=vendor.id
