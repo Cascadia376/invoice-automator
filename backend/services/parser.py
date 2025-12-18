@@ -329,6 +329,11 @@ def save_new_template(template_content: str, vendor_name: str, org_id: str):
         db.close()
 
 def map_to_schema(data):
+    mapped_lines = data.get('lines', [])
+    print(f"PARSER DEBUG: map_to_schema found {len(mapped_lines)} raw lines from invoice2data")
+    if len(mapped_lines) > 0:
+        print(f"PARSER DEBUG: First line sample: {mapped_lines[0]}")
+        
     return {
         "invoice_number": str(data.get('invoice_number', 'UNKNOWN')),
         "vendor_name": data.get('issuer', 'UNKNOWN'),
@@ -339,7 +344,7 @@ def map_to_schema(data):
         "discount_amount": safe_float(data.get('discount_amount')),
         "tax_amount": 0.0,
         "currency": "CAD",
-        "line_items": data.get('lines', []) # Map invoice2data 'lines' to our 'line_items'
+        "line_items": mapped_lines # Map invoice2data 'lines' to our 'line_items'
     }
 
 def refine_template_with_feedback(file_path: str, corrected_data: dict, org_id: str):

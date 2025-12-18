@@ -164,19 +164,26 @@ def read_invoices(
              
     return invoices
 
+from sqlalchemy.orm import joinedload
+
 @router.get("/{invoice_id}", response_model=schemas.Invoice)
 def read_invoice(
     invoice_id: str, 
     db: Session = Depends(get_db),
     ctx: auth.UserContext = Depends(auth.get_current_user)
 ):
-    invoice = db.query(models.Invoice).filter(
+    print(f"READ REQUEST: Fetching invoice {invoice_id}")
+    invoice = db.query(models.Invoice).options(joinedload(models.Invoice.line_items)).filter(
         models.Invoice.id == invoice_id,
         models.Invoice.organization_id == ctx.org_id
     ).first()
+    
     if invoice is None:
+        print(f"READ ERROR: Invoice {invoice_id} not found")
         raise HTTPException(status_code=404, detail="Invoice not found")
-        
+    
+    print(f"READ SUCCESS: Found invoice {invoice_id}. Line Items Count: {len(invoice.line_items)}")
+    
     if invoice.file_url and not invoice.file_url.startswith("http"):
          invoice.file_url = storage.get_presigned_url(invoice.file_url)
          
