@@ -11,7 +11,7 @@ import fitz # PyMuPDF
 
 import models, schemas, auth
 from database import get_db
-from services import parser, textract_service, vendor_service, product_service
+from services import parser, textract_service, vendor_service, product_service, storage
 from services.textract_service import parse_float
 
 router = APIRouter(

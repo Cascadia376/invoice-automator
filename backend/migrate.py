@@ -27,63 +27,37 @@ def migrate():
     models.Base.metadata.create_all(bind=engine)
     
     with engine.connect() as conn:
-        try:
-            # Add new columns if they don't exist
-            print("Adding subtotal column...")
-            conn.execute(text("ALTER TABLE invoices ADD COLUMN subtotal FLOAT DEFAULT 0.0"))
-            conn.commit()
-        except Exception as e:
-            print(f"subtotal column might already exist or error: {e}")
-        
-        try:
-            print("Adding shipping_amount column...")
-            conn.execute(text("ALTER TABLE invoices ADD COLUMN shipping_amount FLOAT DEFAULT 0.0"))
-            conn.commit()
-        except Exception as e:
-            print(f"shipping_amount column might already exist or error: {e}")
-        
-        try:
-            print("Adding discount_amount column...")
-            conn.execute(text("ALTER TABLE invoices ADD COLUMN discount_amount FLOAT DEFAULT 0.0"))
-            conn.commit()
-        except Exception as e:
-            print(f"discount_amount column might already exist or error: {e}")
-        
-        try:
-            print("Adding deposit_amount column...")
-            conn.execute(text("ALTER TABLE invoices ADD COLUMN deposit_amount FLOAT DEFAULT 0.0"))
-            conn.commit()
-        except Exception as e:
-            print(f"deposit_amount column might already exist or error: {e}")
+        # 1. Invoices Table Extras
+        columns_to_add = [
+            ("subtotal", "FLOAT DEFAULT 0.0"),
+            ("shipping_amount", "FLOAT DEFAULT 0.0"),
+            ("discount_amount", "FLOAT DEFAULT 0.0"),
+            ("deposit_amount", "FLOAT DEFAULT 0.0"),
+            ("tax_amount", "FLOAT DEFAULT 0.0"),
+            ("issue_type", "VARCHAR"),
+            ("vendor_id", "VARCHAR REFERENCES vendors(id)"),
+            ("raw_extraction_results", "VARCHAR"),
+            ("po_number", "VARCHAR")
+        ]
 
-        try:
-            print("Adding issue_type column...")
-            conn.execute(text("ALTER TABLE invoices ADD COLUMN issue_type VARCHAR"))
-            conn.commit()
-        except Exception as e:
-            print(f"issue_type column might already exist or error: {e}")
+        for col_name, col_type in columns_to_add:
+            try:
+                print(f"Adding {col_name} to invoices...")
+                conn.execute(text(f"ALTER TABLE invoices ADD COLUMN {col_name} {col_type}"))
+                conn.commit()
+            except Exception as e:
+                print(f"Note: Could not add {col_name} (likely already exists): {e}")
 
-        try:
-            print("Adding vendor_id column...")
-            conn.execute(text("ALTER TABLE invoices ADD COLUMN vendor_id VARCHAR REFERENCES vendors(id)"))
-            conn.execute(text("CREATE INDEX ix_invoices_vendor_id ON invoices (vendor_id)"))
-            conn.commit()
-        except Exception as e:
-            print(f"vendor_id column might already exist or error: {e}")
-
-        try:
-            print("Adding raw_extraction_results column...")
-            conn.execute(text("ALTER TABLE invoices ADD COLUMN raw_extraction_results VARCHAR"))
-            conn.commit()
-        except Exception as e:
-            print(f"raw_extraction_results column might already exist or error: {e}")
-
-        # Multi-tenancy migrations
+        # 2. Add organization_id to all relevant tables for multi-tenancy
         tables_to_migrate = [
             "invoices", 
+            "line_items", # Added line_items for direct filtering support
             "gl_categories", 
             "sku_category_mappings", 
             "templates",
+            "vendors",
+            "vendor_field_mappings",
+            "vendor_corrections",
             "products",
             "product_orders"
         ]
@@ -91,12 +65,11 @@ def migrate():
         for table in tables_to_migrate:
             try:
                 print(f"Adding organization_id to {table}...")
-                # Add as nullable first or with default to handle existing rows
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN organization_id VARCHAR DEFAULT 'default_org'"))
                 conn.execute(text(f"CREATE INDEX ix_{table}_organization_id ON {table} (organization_id)"))
                 conn.commit()
             except Exception as e:
-                print(f"organization_id column might already exist in {table} or error: {e}")
+                print(f"Note: organization_id might already exist in {table}: {e}")
 
     
     print("Migration complete!")
