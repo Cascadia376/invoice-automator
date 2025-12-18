@@ -65,7 +65,8 @@ def migrate():
         for table in tables_to_migrate:
             try:
                 print(f"Adding organization_id to {table}...")
-                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN organization_id VARCHAR DEFAULT 'default_org'"))
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN organization_id VARCHAR DEFAULT 'dev-org'"))
+                conn.execute(text(f"UPDATE {table} SET organization_id = 'dev-org' WHERE organization_id = 'default_org' OR organization_id IS NULL"))
                 conn.execute(text(f"CREATE INDEX ix_{table}_organization_id ON {table} (organization_id)"))
                 conn.commit()
             except Exception as e:

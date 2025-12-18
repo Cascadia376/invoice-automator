@@ -11,7 +11,7 @@ import fitz # PyMuPDF
 
 import models, schemas, auth
 from database import get_db
-from services import parser, textract_service, vendor_service, product_service, storage
+from services import parser, textract_service, vendor_service, product_service, storage, validation_service
 from services.textract_service import parse_float
 
 router = APIRouter(
@@ -133,6 +133,7 @@ async def upload_invoice(
             db.add(db_item)
         
         print(f"COMMITTING: {len(line_items_data)} line items")
+        db.commit()
         db.refresh(db_invoice)
         
         # Generate presigned URL for immediate display
