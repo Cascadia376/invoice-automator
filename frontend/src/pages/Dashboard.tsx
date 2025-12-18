@@ -3,7 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Search, Plus, Inbox, Beaker, MoreVertical, AlertCircle, Clock, FileText } from "lucide-react";
+import { Search, Plus, Inbox, Beaker, MoreVertical, AlertCircle, Clock, FileText, FileDown, Trash2 } from "lucide-react";
 
 export default function Dashboard() {
     const { invoices, stats, deleteInvoice, updateInvoice } = useInvoice();
@@ -12,6 +12,7 @@ export default function Dashboard() {
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState<'all' | 'needs_review' | 'approved' | 'failed'>('all');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [isLoading, setIsLoading] = useState(false);
 
     const filteredInvoices = invoices.filter(invoice => {
         const matchesSearch =
@@ -145,6 +146,44 @@ export default function Dashboard() {
         toast.success(`Exported ${filteredInvoices.length} invoices`);
     };
 
+    const handleBulkExportExcel = async () => {
+        setIsLoading(true);
+        const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+        try {
+            const ids = Array.from(selectedIds);
+            const response = await fetch(`${API_BASE}/api/invoices/export/excel/bulk`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${await getToken()}`
+                },
+                body: JSON.stringify(ids)
+            });
+
+            if (!response.ok) throw new Error("Export failed");
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `Invoices_Bulk_Export_${new Date().toISOString().split('T')[0]}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            toast.success("Bulk export successful", {
+                description: `Exported ${ids.length} invoices to ZIP.`,
+            });
+        } catch (error: any) {
+            toast.error("Bulk export failed", {
+                description: error.message,
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
 
@@ -153,6 +192,10 @@ export default function Dashboard() {
                 <div className="flex gap-2">
                     {selectedIds.size > 0 && (
                         <div className="flex gap-2 animate-in fade-in slide-in-from-top-2 bg-white p-1 rounded-lg border border-gray-200 shadow-sm mr-2">
+                            <button onClick={handleBulkExportExcel} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">
+                                <FileDown className="h-4 w-4" />
+                                Export Excel ({selectedIds.size})
+                            </button>
                             <button onClick={handleBulkApprove} className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
                                 Approve ({selectedIds.size})
                             </button>

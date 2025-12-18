@@ -12,6 +12,7 @@ import {
   ExternalLink,
   CircleHelp,
   FileText,
+  FileDown,
 } from "lucide-react";
 import {
   ResizableHandle,
@@ -210,6 +211,40 @@ export default function InvoiceReview() {
       navigate("/dashboard");
     }
   };
+  const handleExportExcel = async () => {
+    if (!invoice) return;
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE}/api/invoices/${invoice.id}/export/excel`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+
+      if (!response.ok) throw new Error("Export failed");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+
+      // Get filename from header if possible, else fallback
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `Invoice_${invoice.id}.xlsx`;
+      if (contentDisposition) {
+        const matches = /filename="?([^"]+)"?/.exec(contentDisposition);
+        if (matches && matches[1]) filename = matches[1];
+      }
+
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success("Excel exported successfully");
+    } catch (error: any) {
+      toast.error(`Export failed: ${error.message}`);
+    }
+  };
 
   useHotkeys('meta+s, ctrl+s', (e) => {
     e.preventDefault();
@@ -286,6 +321,14 @@ export default function InvoiceReview() {
               <button onClick={() => navigate("/dashboard")} className="px-4 py-2 text-sm font-medium border rounded-lg border-gray-300 text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" type="button">
                 Back
               </button>
+              <button
+                onClick={handleExportExcel}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+              >
+                <FileDown className="h-4 w-4" />
+                <span>Excel</span>
+              </button>
+
               <button
                 onClick={async () => {
                   const savedColumns = localStorage.getItem("csv_export_columns");

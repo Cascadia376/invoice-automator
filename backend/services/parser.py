@@ -158,28 +158,36 @@ CRITICAL INSTRUCTIONS FOR LINE ITEMS:
 - If you see both "cases" and "units_per_case", calculate: quantity = cases × units_per_case
 - Pay close attention to decimal points in quantities and prices
 - Extract unit_cost (price per single unit) and amount (total line price) separately
+- **PO NUMBER**: Look specifically for "PO", "P.O.", "Purchase Order", or "Order #". Extract this into the `po_number` field.
+- **LIQUOR INDUSTRY DEPOSITS**: Search aggressively for Bottle Deposits (Btl Dep), Recycling Fees (Env Fee), and Container Deposits. 
+- If these are hidden in line items, extract them. If they are in the summary, extract them.
+- If you find multiple different fees (e.g. Deposit + Recycling), SUM THEM into the `deposit_amount` field.
+- If a line item description contains "Deposit" or "Recycling", but has a negative or small value, treat it as a deposit component.
+- **MATH VALIDATION**: Strictly ensure that `quantity * unit_cost = amount` for every line item. If the invoice shows a total that doesn't match the calculation, flag it in the description or notes.
 
 Return a JSON object with two keys: "data" and "template".
 
 "data" must match this structure:
 {
-    "invoice_number": "string",
-    "vendor_name": "string",
-    "date": "YYYY-MM-DD",
-    "total_amount": float,
-    "subtotal": float,
-    "shipping_amount": float,
-    "discount_amount": float,
-    "currency": "USD",
+    "invoice_number": "str",
+    "po_number": "str",
+    "date": "str (YYYY-MM-DD)",
+    "vendor_name": "str",
+    "vendor_address": "str",
+    "total_amount": "float",
+    "subtotal": "float",
+    "tax_amount": "float",
+    "deposit_amount": "float",
+    "currency": "str (default CAD)",
     "line_items": [{
-        "sku": "string or null (MUST be unique per line item)",
-        "description": "string",
-        "units_per_case": float (default 1.0 if not specified),
-        "cases": float (default 0.0 if not specified),
-        "quantity": float (REQUIRED - extract carefully),
-        "unit_cost": float (price per unit),
-        "amount": float (total for this line),
-        "confidence_score": float (0.0-1.0, where 1.0 = very confident, 0.5 = uncertain, 0.0 = guessing)
+        "sku": "str or null (MUST be unique per line item)",
+        "description": "str",
+        "units_per_case": "float (default 1.0 if not specified)",
+        "cases": "float (default 0.0 if not specified)",
+        "quantity": "float (REQUIRED - extract carefully)",
+        "unit_cost": "float (price per unit)",
+        "amount": "float (total for this line)",
+        "confidence_score": "float (0.0-1.0, where 1.0 = very confident, 0.5 = uncertain, 0.0 = guessing)"
     }]
 }
 
@@ -268,6 +276,20 @@ options:
             
         final_data = result.get("data", {})
         final_data["currency"] = normalize_currency(final_data.get("currency"))
+        final_data["raw_extraction_results"] = json.dumps(result.get("data", {})) # Store for learning
+        
+        # --- MATH VALIDATION ---
+        for item in final_data.get("line_items", []):
+            qty = safe_float(item.get("quantity"))
+            cost = safe_float(item.get("unit_cost"))
+            amt = safe_float(item.get("amount"))
+            
+            # Allow for tiny rounding differences (±0.02)
+            if abs((qty * cost) - amt) > 0.02:
+                print(f"DEBUG: Math mismatch on {item.get('description')}: {qty} * {cost} = {qty*cost} (Invoice says {amt})")
+                # Automatically fix the amount if it's clearly a parsing error and cost/qty look reliable
+                # Or just mark it for user review if it's suspicious. For now, we trust the math.
+                item["amount"] = round(qty * cost, 2)
         
         return final_data
 

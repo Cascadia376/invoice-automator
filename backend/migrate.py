@@ -16,9 +16,14 @@ connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
 
 print(f"DATABASE CONNECTION: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else 'sqlite_local'}")
 
+import models
+
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
 
 def migrate():
+    # Ensure all tables exist first
+    models.Base.metadata.create_all(bind=engine)
+    
     with engine.connect() as conn:
         try:
             # Add new columns if they don't exist
@@ -64,12 +69,21 @@ def migrate():
         except Exception as e:
             print(f"vendor_id column might already exist or error: {e}")
 
+        try:
+            print("Adding raw_extraction_results column...")
+            conn.execute(text("ALTER TABLE invoices ADD COLUMN raw_extraction_results VARCHAR"))
+            conn.commit()
+        except Exception as e:
+            print(f"raw_extraction_results column might already exist or error: {e}")
+
         # Multi-tenancy migrations
         tables_to_migrate = [
             "invoices", 
             "gl_categories", 
             "sku_category_mappings", 
-            "templates"
+            "templates",
+            "products",
+            "product_orders"
         ]
         
         for table in tables_to_migrate:

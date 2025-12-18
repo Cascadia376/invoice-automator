@@ -10,6 +10,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func
 
 import models
+import json
+import os
+from services.textract_service import parse_float
 
 def normalize_vendor_name(name: str) -> str:
     """Normalize vendor name for consistent matching."""
@@ -94,14 +97,33 @@ def get_vendor_field_mappings(db: Session, vendor_id: str) -> Dict[str, str]:
     return {m.field_name: m.textract_field for m in mappings}
 
 def apply_vendor_corrections(db: Session, invoice_data: Dict, vendor: models.Vendor) -> Dict:
-    """Apply learned corrections to invoice data."""
-    # Get field mappings
+    """Apply learned corrections to invoice data using raw results."""
+    # 1. Get field mappings for this vendor
     mappings = get_vendor_field_mappings(db, vendor.id)
-    
-    # Apply mappings (this would be used during Textract extraction)
-    # For now, just return the data as-is
-    # TODO: Implement field mapping application during extraction
-    
+    if not mappings:
+        return invoice_data
+        
+    # 2. Extract raw results if present
+    raw_results_str = invoice_data.get("raw_extraction_results")
+    if not raw_results_str:
+        return invoice_data
+        
+    try:
+        raw_data = json.loads(raw_results_str)
+        
+        # 3. Apply mappings
+        for field_name, raw_field in mappings.items():
+            # If the field is already set (non-zero/non-null), maybe don't override?
+            # Actually, learned mappings should take precedence if they point to a specific value.
+            if raw_field in raw_data:
+                learned_val = parse_float(raw_data[raw_field])
+                if learned_val != 0:
+                    print(f"APPLYING MAPPING: {field_name} = {learned_val} (from raw field '{raw_field}')")
+                    invoice_data[field_name] = learned_val
+                    
+    except Exception as e:
+        print(f"Error applying vendor corrections: {e}")
+        
     return invoice_data
 
 def learn_from_correction(
@@ -112,6 +134,7 @@ def learn_from_correction(
     field_name: str,
     original_value: Any,
     corrected_value: Any,
+    raw_extraction_results: Optional[str] = None,
     user_id: Optional[str] = None
 ):
     """Learn from a user correction."""
@@ -120,7 +143,6 @@ def learn_from_correction(
     if original_value is None or original_value == "" or original_value == 0:
         correction_type = "missing"
     
-    # Store correction
     correction = models.VendorCorrection(
         id=str(uuid.uuid4()),
         vendor_id=vendor_id,
@@ -134,9 +156,40 @@ def learn_from_correction(
     )
     db.add(correction)
     
-    # Update field mapping confidence if applicable
-    # TODO: Implement confidence scoring based on correction frequency
-    
+    # --- LEARNING LOOP ---
+    if raw_extraction_results and corrected_value:
+        try:
+            raw_data = json.loads(raw_extraction_results)
+            corrected_val_str = str(corrected_value).strip()
+            
+            # Look for a field in the raw scan that matches the corrected value
+            for raw_field, raw_val in raw_data.items():
+                if str(raw_val).strip() == corrected_val_str:
+                    print(f"MATCH FOUND: Corrected {field_name} matches raw scan field '{raw_field}'")
+                    
+                    # Create or update mapping
+                    existing_mapping = db.query(models.VendorFieldMapping).filter(
+                        models.VendorFieldMapping.vendor_id == vendor_id,
+                        models.VendorFieldMapping.field_name == field_name,
+                        models.VendorFieldMapping.textract_field == raw_field
+                    ).first()
+                    
+                    if existing_mapping:
+                        existing_mapping.usage_count += 1
+                        existing_mapping.last_used = datetime.utcnow()
+                    else:
+                        new_mapping = models.VendorFieldMapping(
+                            id=str(uuid.uuid4()),
+                            vendor_id=vendor_id,
+                            organization_id=org_id,
+                            field_name=field_name,
+                            textract_field=raw_field,
+                            usage_count=1
+                        )
+                        db.add(new_mapping)
+                    break
+        except Exception as e:
+            print(f"Learning failed: {e}")
     db.commit()
     print(f"Learned correction for vendor {vendor_id}: {field_name} = {corrected_value}")
 

@@ -1,5 +1,6 @@
 import boto3
 import os
+import json
 from typing import Dict, List, Optional
 
 # Configuration
@@ -161,6 +162,9 @@ def extract_invoice_with_textract(s3_bucket: str, s3_key: str) -> Optional[Dict]
             parse_float(summary_fields.get('DEPOSIT', {}).get('value', '0.0')) or
             parse_float(summary_fields.get('DEPOSIT_AMOUNT', {}).get('value', '0.0')) or
             parse_float(summary_fields.get('PAYMENT', {}).get('value', '0.0')) or
+            parse_float(summary_fields.get('BOTTLE_DEPOSIT', {}).get('value', '0.0')) or
+            parse_float(summary_fields.get('RECYCLING_FEE', {}).get('value', '0.0')) or
+            parse_float(summary_fields.get('ENV_FEE', {}).get('value', '0.0')) or
             0.0
         )
         
@@ -185,7 +189,8 @@ def extract_invoice_with_textract(s3_bucket: str, s3_key: str) -> Optional[Dict]
             'shipping_amount': 0.0,
             'discount_amount': 0.0,
             'currency': 'CAD',
-            'line_items': line_items
+            'line_items': line_items,
+            'raw_extraction_results': json.dumps({k: v['value'] for k, v in summary_fields.items()}) # Mask confidences for learning
         }
         
         # Calculate average confidence

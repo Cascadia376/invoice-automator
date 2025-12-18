@@ -11,8 +11,8 @@ import fitz # PyMuPDF
 
 import models, schemas, auth
 from database import get_db
-from services import parser, storage, vendor_service, validation_service
-from services.parser import safe_float
+from services import parser, textract_service, vendor_service, product_service
+from services.textract_service import parse_float
 
 router = APIRouter(
     prefix="/api/invoices",
@@ -59,6 +59,22 @@ async def upload_invoice(
         vendor = vendor_service.get_or_create_vendor(db, vendor_name, ctx.org_id)
         print(f"Vendor: {vendor.name} (ID: {vendor.id})")
         
+        # Apply learned corrections (e.g. bottle deposits)
+        extracted_data = vendor_service.apply_vendor_corrections(db, extracted_data, vendor)
+        
+        # Product Intelligence & Validation
+        all_item_flags = []
+        for item in extracted_data.get("line_items", []):
+            validation = product_service.validate_item_against_master(db, ctx.org_id, item)
+            if validation["status"] == "success" and validation["flags"]:
+                all_item_flags.extend(validation["flags"])
+                # Supplement item data with master data if missing
+                if validation.get("master_category"):
+                    item["category_gl_code"] = validation["master_category"]
+        
+        # If we have validation flags, we could store them in notes or a specific field.
+        # For now, let's prefix the status or add a note if we had one.
+        
         # Create DB Entry
         db_invoice = models.Invoice(
             id=file_id,
@@ -75,6 +91,7 @@ async def upload_invoice(
             currency=extracted_data.get("currency", "CAD"),
             status="needs_review",
             file_url=s3_key, # Store S3 key
+            raw_extraction_results=extracted_data.get("raw_extraction_results"),
             vendor_id=vendor.id
         )
         db.add(db_invoice)
@@ -305,6 +322,7 @@ def submit_feedback(
                         field,
                         old_val,
                         new_val,
+                        raw_extraction_results=db_invoice.raw_extraction_results,
                         user_id=ctx.user_id
                     )
 
@@ -410,6 +428,56 @@ def get_invoice_highlights(
         print(f"Error generating highlights: {e}")
         return {}
 
+@router.get("/{invoice_id}/validate")
+def validate_invoice(
+    invoice_id: str,
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    invoice = db.query(models.Invoice).filter(
+        models.Invoice.id == invoice_id,
+        models.Invoice.organization_id == ctx.org_id
+    ).first()
+    
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+        
+    line_item_warnings = {}
+    global_warnings = []
+    
+    # 1. Math Check (Quantity * Unit Cost = Amount)
+    for item in invoice.line_items:
+        if abs((item.quantity * item.unit_cost) - item.amount) > 0.02:
+            warnings = line_item_warnings.get(item.id, [])
+            warnings.append(f"Math Error: {item.quantity} * {item.unit_cost} = {item.quantity * item.unit_cost:.2f} (Invoice says {item.amount:.2f})")
+            line_item_warnings[item.id] = warnings
+
+    # 2. Product Master Data Check (via Supabase/Cache)
+    for item in invoice.line_items:
+        validation = product_service.validate_item_against_master(db, ctx.org_id, {
+            "sku": item.sku,
+            "description": item.description,
+            "units_per_case": item.units_per_case,
+            "quantity": item.quantity,
+            "unit_cost": item.unit_cost,
+            "amount": item.amount
+        })
+        
+        if validation["status"] == "success" and validation["flags"]:
+            warnings = line_item_warnings.get(item.id, [])
+            warnings.extend(validation["flags"])
+            line_item_warnings[item.id] = warnings
+
+    # 3. Global Checks (Sum of line items vs subtotal)
+    sum_items = sum(item.amount for item in invoice.line_items)
+    if abs(sum_items - (invoice.subtotal or 0)) > 0.05:
+        global_warnings.append(f"Subtotal Mismatch: Sum of items ({sum_items:.2f}) ≠ Subtotal ({invoice.subtotal:.2f})")
+
+    return {
+        "global_warnings": global_warnings,
+        "line_item_warnings": line_item_warnings
+    }
+
 @router.get("/{invoice_id}/export/csv")
 def export_invoice_csv(
     invoice_id: str, 
@@ -459,11 +527,6 @@ def export_invoice_csv(
             valid_keys = [k for k in requested_keys if k in all_columns_map]
             if valid_keys:
                 selected_keys = valid_keys
-                header_map = {k: k for k in selected_keys}
-    
-    writer.writerow([header_map[k] for k in selected_keys])
-    
-    for item in invoice.line_items:
         row = [all_columns_map[k](invoice, item) for k in selected_keys]
         writer.writerow(row)
         
@@ -474,3 +537,109 @@ def export_invoice_csv(
     }
     
     return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers=headers)
+
+@router.get("/{invoice_id}/export/excel")
+def export_invoice_excel(
+    invoice_id: str, 
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    invoice = db.query(models.Invoice).filter(
+        models.Invoice.id == invoice_id,
+        models.Invoice.organization_id == ctx.org_id
+    ).first()
+    
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    from datetime import datetime
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Invoice Export"
+    
+    # Headers based on user request: SKU, Receiving Qty (UOM), Confirmed total
+    headers = ["SKU", "Receiving Qty (UOM)", "Confirmed total"]
+    ws.append(headers)
+    
+    # Make headers bold
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        
+    for item in invoice.line_items:
+        ws.append([
+            item.sku or "N/A",
+            item.quantity,
+            item.amount
+        ])
+        
+    # Filename: [Supplier Name] - [Date] - [PO Number].xlsx
+    safe_vendor = "".join(x for x in (invoice.vendor_name or "Unknown") if x.isalnum() or x in " -_").strip()
+    safe_date = invoice.date or datetime.now().strftime("%Y-%m-%d")
+    safe_po = invoice.po_number or "NO-PO"
+    filename = f"{safe_vendor} - {safe_date} - {safe_po}.xlsx"
+    
+    # Save to memory
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    return Response(
+        content=output.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename=\"{filename}\"",
+            "Access-Control-Expose-Headers": "Content-Disposition"
+        }
+    )
+
+@router.post("/export/excel/bulk")
+def export_invoices_bulk(
+    invoice_ids: List[str],
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    invoices = db.query(models.Invoice).filter(
+        models.Invoice.id.in_(invoice_ids),
+        models.Invoice.organization_id == ctx.org_id
+    ).all()
+    
+    if not invoices:
+        raise HTTPException(status_code=404, detail="No invoices found")
+        
+    import zipfile
+    from openpyxl import Workbook
+    from datetime import datetime
+    
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+        for invoice in invoices:
+            wb = Workbook()
+            ws = wb.active
+            headers = ["SKU", "Receiving Qty (UOM)", "Confirmed total"]
+            ws.append(headers)
+            
+            for item in invoice.line_items:
+                ws.append([item.sku or "N/A", item.quantity, item.amount])
+                
+            safe_vendor = "".join(x for x in (invoice.vendor_name or "Unknown") if x.isalnum() or x in " -_").strip()
+            safe_date = invoice.date or datetime.now().strftime("%Y-%m-%d")
+            safe_po = invoice.po_number or "NO-PO"
+            filename = f"{safe_vendor} - {safe_date} - {safe_po}.xlsx"
+            
+            excel_buffer = io.BytesIO()
+            wb.save(excel_buffer)
+            zip_file.writestr(filename, excel_buffer.getvalue())
+            
+    zip_buffer.seek(0)
+    
+    return Response(
+        content=zip_buffer.getvalue(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f"attachment; filename=\"Invoices_Export_{datetime.now().strftime('%Y%m%d')}.zip\"",
+            "Access-Control-Expose-Headers": "Content-Disposition"
+        }
+    )

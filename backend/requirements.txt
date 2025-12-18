@@ -13,3 +13,5 @@ pillow
 pyjwt
 requests
 cryptography
+openpyxl
+supabase

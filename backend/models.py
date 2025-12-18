@@ -25,6 +25,7 @@ class Invoice(Base):
     status = Column(String, default="ingested")
     issue_type = Column(String, nullable=True) # breakage, shortship, overship, misship
     file_url = Column(String, nullable=True)
+    raw_extraction_results = Column(String, nullable=True) # JSON string of raw Textract/LLM output
     vendor_id = Column(String, ForeignKey("vendors.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -125,3 +126,31 @@ class VendorCorrection(Base):
     rule = Column(String, nullable=True)  # e.g., "deposit = subtotal * 0.05"
     created_at = Column(DateTime, default=datetime.utcnow)
     created_by = Column(String, nullable=True)  # user_id
+class Product(Base):
+    """Master product data for validation"""
+    __tablename__ = "products"
+
+    id = Column(String, primary_key=True, index=True)
+    organization_id = Column(String, index=True, nullable=False)
+    sku = Column(String, index=True)
+    name = Column(String)
+    category = Column(String, nullable=True)
+    units_per_case = Column(Float, default=1.0)
+    average_cost = Column(Float, default=0.0)
+    last_cost = Column(Float, default=0.0)
+    min_typical_qty = Column(Float, nullable=True)
+    max_typical_qty = Column(Float, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class ProductOrder(Base):
+    """Historical record of product purchases for anomaly detection"""
+    __tablename__ = "product_orders"
+
+    id = Column(String, primary_key=True, index=True)
+    organization_id = Column(String, index=True, nullable=False)
+    product_id = Column(String, ForeignKey("products.id"))
+    invoice_id = Column(String, ForeignKey("invoices.id"))
+    quantity = Column(Float)
+    unit_cost = Column(Float)
+    purchased_at = Column(DateTime, default=datetime.utcnow)
