@@ -16,8 +16,8 @@ Goals & KPIs
 - Export Accuracy: 0 formatting errors for POS import files.
 
 Users
-- Inventory Manager / Receiver: Uploads invoices, reviews exceptions, exports data.
-- Accountant: Verifies GL coding (mapped from Category/SKU).
+- Store Manager / Inventory Manager / Receiver: Uploads invoices, reviews exceptions, exports data.
+- Bookkeepers: Verifies GL coding (mapped from Category/SKU).
 
 Core Workflow (MVP)
 1. Ingest: Upload PDF invoices (Email ingestion planned for v2).
@@ -40,20 +40,24 @@ Functional Requirements
     - Normalize "Case Cost" vs "Unit Cost" (Liquor invoices often vary).
 - Data Model:
     - Invoices: id, status (uploaded, review, approved), vendor_id, dates, totals.
-    - Line Items: invoice_id, raw_desc, sku, qty, pack_size, cost, total.
+    - Line Items: invoice_id, raw_desc, sku, qty, pack_size, cost, total, category_gl_code.
 - Validation Rules (The "Robust Error Checking"):
     - Math checks (Qty * Cost = Total).
     - Invoice Footing (Sum lines = Subtotal).
     - Confidence score threshold alerts.
+- Liquidity Retail Spec:
+    - **Strict Categories**: Items must be classified into: BEER, WINE, LIQUOR, COOLERS, CIDER, TOBACCO, LOTTERY, MISC, MIX & CONFEC.
+    - **GL Summary**: Review screen must show totals grouped by these categories for bookkeeping validation.
 - Error Tracking / Analytics:
     - Log every "validation error" triggered.
     - Dashboard showing "Invoices with Issues" vs "Clean Invoices".
 - Export:
+    - **CSV Format**: Strict columns "SKU", "Receiving Qty (UOM)", "Confirmed total".
     - Configurable mapping for POS columns (e.g. "Vendor Stock No" -> "SKU", "Case Cost" -> "Cost").
 
 Roadmap (MVP to Pilot)
-- [ ] Phase 1: Ingestion & Extraction Accuracy (Get the data out).
-- [ ] Phase 2: Review Interface & Basic Math Validation (Make it verifiable).
-- [ ] Phase 3: Export Formatter (Make it usable).
+- [x] Phase 1: Ingestion & Extraction Accuracy (Get the data out).
+- [x] Phase 2: Review Interface & Basic Math Validation (Make it verifiable).
+- [x] Phase 3: Export Formatter & GL Categorization (Make it usable).
 - [ ] Phase 4: Pilot Launch (One store user testing).
 
