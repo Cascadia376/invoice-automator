@@ -450,7 +450,7 @@ export default function InvoiceReview() {
                           const left = (window.screen.width / 2) - (width / 2);
                           const top = (window.screen.height / 2) - (height / 2);
                           window.open(
-                            `/invoices/${id}/pdf`,
+                            `/invoices/${id}/pdf?url=${encodeURIComponent(pdfUrl)}`,
                             '_blank',
                             `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes,status=yes`
                           );

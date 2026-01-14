@@ -88,6 +88,13 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }, [getToken, disableAuth]);
 
     useEffect(() => {
+        // Optimization: Skip fetching data if we are in the standalone PDF view
+        // The PDF view receives its data via URL parameters to be instant
+        if (window.location.pathname.endsWith('/pdf')) {
+            setIsLoading(false);
+            return;
+        }
+
         if (user || orgId || disableAuth) {
             refreshInvoices();
             fetchGLCategories();
