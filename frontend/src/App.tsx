@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
 import InvoiceReview from "./pages/InvoiceReview";
+import PDFViewOnly from "./pages/PDFViewOnly";
 import Settings from "./pages/Settings";
 import Vendors from "./pages/Vendors";
 import VendorDetail from "./pages/VendorDetail";
@@ -66,6 +67,7 @@ const App = () => {
                     <Route path="/settings" element={<Settings />} />
                   </Route>
                   <Route path="/invoices/:id" element={<InvoiceReview />} />
+                  <Route path="/invoices/:id/pdf" element={<PDFViewOnly />} />
                   <Route path="/vendors/:vendorId" element={<VendorDetail />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>

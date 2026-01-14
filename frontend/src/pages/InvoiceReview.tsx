@@ -444,9 +444,19 @@ export default function InvoiceReview() {
                     <h2 className="text-lg font-semibold text-gray-900">Invoice Preview</h2>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => window.open(pdfUrl, '_blank', 'noopener,noreferrer')}
+                        onClick={() => {
+                          const width = 1200;
+                          const height = 800;
+                          const left = (window.screen.width / 2) - (width / 2);
+                          const top = (window.screen.height / 2) - (height / 2);
+                          window.open(
+                            `/invoices/${id}/pdf`,
+                            '_blank',
+                            `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes,status=yes`
+                          );
+                        }}
                         className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-md transition-colors"
-                        title="Open in new window"
+                        title="Open PDF in new window"
                       >
                         <ExternalLink className="h-4 w-4" />
                       </button>

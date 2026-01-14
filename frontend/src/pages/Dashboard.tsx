@@ -415,17 +415,7 @@ export default function Dashboard() {
                                     <tr
                                         key={invoice.id}
                                         className="hover:bg-gray-50 cursor-pointer transition-colors"
-                                        onClick={() => {
-                                            const width = 1200;
-                                            const height = 800;
-                                            const left = (window.screen.width / 2) - (width / 2);
-                                            const top = (window.screen.height / 2) - (height / 2);
-                                            window.open(
-                                                `/invoices/${invoice.id}`,
-                                                '_blank',
-                                                `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes,status=yes`
-                                            );
-                                        }}
+                                        onClick={() => navigate(`/invoices/${invoice.id}`)}
                                     >
                                         <td className="whitespace-nowrap px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                             <input
