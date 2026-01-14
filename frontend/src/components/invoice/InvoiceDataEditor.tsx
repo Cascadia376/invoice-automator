@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 const lineItemSchema = z.object({
   sku: z.string().optional(),
@@ -141,6 +141,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
     register,
     watch,
     setValue,
+    getValues,
     reset,
     formState: { errors },
   } = useForm<InvoiceFormData>({
@@ -418,7 +419,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
               <div className="flex items-center gap-4">
                 {subtotalMismatch && (
                   <span className="text-xs text-yellow-600">
-                    Sum ({lineItemsSum.toFixed(2)}) ≠ Subtotal ({subtotal.toFixed(2)})
+                    Sum ({formatCurrency(lineItemsSum)}) ≠ Subtotal ({formatCurrency(subtotal)})
                   </span>
                 )}
 
@@ -537,7 +538,15 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                         <TableCell className="p-1">
                           <Input
                             type="number"
-                            {...register(`lineItems.${index}.quantity`)}
+                            {...register(`lineItems.${index}.quantity`, {
+                              onChange: (e) => {
+                                const qty = parseFloat(e.target.value) || 0;
+                                const cost = getValues(`lineItems.${index}.unitCost`) || 0;
+                                const total = parseFloat((qty * cost).toFixed(2));
+                                setValue(`lineItems.${index}.amount`, total);
+                                handleFieldChange();
+                              }
+                            })}
                             className="h-7 w-full bg-transparent border-transparent hover:border-input focus:border-input px-2 text-right text-xs"
                           />
                         </TableCell>
@@ -547,7 +556,15 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                           <Input
                             type="number"
                             step="0.01"
-                            {...register(`lineItems.${index}.unitCost`)}
+                            {...register(`lineItems.${index}.unitCost`, {
+                              onChange: (e) => {
+                                const cost = parseFloat(e.target.value) || 0;
+                                const qty = getValues(`lineItems.${index}.quantity`) || 0;
+                                const total = parseFloat((qty * cost).toFixed(2));
+                                setValue(`lineItems.${index}.amount`, total);
+                                handleFieldChange();
+                              }
+                            })}
                             className="h-7 w-full bg-transparent border-transparent hover:border-input focus:border-input px-2 text-right text-xs"
                           />
                         </TableCell>
@@ -623,7 +640,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                   {categoryTotals.map(([category, total]) => (
                     <TableRow key={category} className="h-8">
                       <TableCell className="font-medium p-2 text-xs">{category}</TableCell>
-                      <TableCell className="text-right font-mono p-2 text-xs">${total.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-mono p-2 text-xs">{formatCurrency(total)}</TableCell>
                     </TableRow>
                   ))}
                   {categoryTotals.length === 0 && (
@@ -715,7 +732,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                   />
                   {totalMismatch && (
                     <div className="absolute right-32 top-1 text-xs text-muted-foreground whitespace-nowrap">
-                      Calc: {calculatedTotal.toFixed(2)}
+                      Calc: {formatCurrency(calculatedTotal)}
                     </div>
                   )}
                 </div>

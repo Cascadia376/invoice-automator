@@ -2,11 +2,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { formatCurrency } from "@/lib/utils";
 
 const tiers = [
   {
     name: "Solo",
-    price: "$99",
+    price: 99,
     description: "Perfect for freelancers and micro businesses",
     features: [
       "200 invoices/month",
@@ -20,7 +21,7 @@ const tiers = [
   },
   {
     name: "Pro",
-    price: "$249",
+    price: 249,
     description: "For bookkeepers and small firms",
     features: [
       "1,000 invoices/month",
@@ -35,7 +36,7 @@ const tiers = [
   },
   {
     name: "Agency",
-    price: "$499",
+    price: 499,
     description: "For agencies and accounting teams",
     features: [
       "5,000 invoices/month",
@@ -72,9 +73,8 @@ export const Pricing = () => {
           {tiers.map((tier, index) => (
             <Card
               key={index}
-              className={`relative border-border/50 hover-lift ${
-                tier.popular ? "border-primary shadow-xl scale-105" : ""
-              }`}
+              className={`relative border-border/50 hover-lift ${tier.popular ? "border-primary shadow-xl scale-105" : ""
+                }`}
             >
               {tier.popular && (
                 <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-primary border-0">
@@ -84,7 +84,7 @@ export const Pricing = () => {
               <CardHeader className="text-center pb-8">
                 <CardTitle className="text-2xl mb-2">{tier.name}</CardTitle>
                 <div className="mb-2">
-                  <span className="text-4xl font-bold">{tier.price}</span>
+                  <span className="text-4xl font-bold">{formatCurrency(tier.price)}</span>
                   <span className="text-muted-foreground ml-2">one-time</span>
                 </div>
                 <CardDescription>{tier.description}</CardDescription>

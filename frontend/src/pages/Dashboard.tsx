@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Search, Plus, Inbox, Beaker, MoreVertical, AlertCircle, Clock, FileText, FileDown, Trash2 } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 
 export default function Dashboard() {
     const { invoices, stats, deleteInvoice, updateInvoice } = useInvoice();
@@ -253,7 +254,7 @@ export default function Dashboard() {
                         <div>
                             <p className="text-sm font-medium text-gray-500">Pending Approval</p>
                             <p className="mt-2 text-3xl font-bold text-gray-900">
-                                {new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(pendingAmount)}
+                                {formatCurrency(pendingAmount)}
                             </p>
                         </div>
                         <div className="rounded-full bg-amber-50 p-3">
@@ -414,7 +415,17 @@ export default function Dashboard() {
                                     <tr
                                         key={invoice.id}
                                         className="hover:bg-gray-50 cursor-pointer transition-colors"
-                                        onClick={() => navigate(`/invoices/${invoice.id}`)}
+                                        onClick={() => {
+                                            const width = 1200;
+                                            const height = 800;
+                                            const left = (window.screen.width / 2) - (width / 2);
+                                            const top = (window.screen.height / 2) - (height / 2);
+                                            window.open(
+                                                `/invoices/${invoice.id}`,
+                                                '_blank',
+                                                `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes,status=yes`
+                                            );
+                                        }}
                                     >
                                         <td className="whitespace-nowrap px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                             <input
@@ -427,10 +438,7 @@ export default function Dashboard() {
                                         <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">{invoice.invoiceNumber}</td>
                                         <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{invoice.vendorName}</td>
                                         <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900 font-medium">
-                                            {new Intl.NumberFormat('en-CA', {
-                                                style: 'currency',
-                                                currency: 'CAD'
-                                            }).format(invoice.totalAmount)}
+                                            {formatCurrency(invoice.totalAmount)}
                                         </td>
                                         <td className="whitespace-nowrap px-4 py-3 text-sm">
                                             {invoice.status === 'needs_review' && (

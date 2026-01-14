@@ -110,21 +110,7 @@ export default function Upload() {
                 </CardContent>
             </Card>
 
-            <div className="space-y-4">
-                <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Supported Formats</h3>
-                <div className="flex gap-4">
-                    <div className="flex items-center gap-2 p-3 rounded-lg border bg-card text-sm">
-                        <FileIcon className="h-4 w-4 text-red-500" />
-                        <span>Native PDF</span>
-                        <CheckCircle2 className="h-3 w-3 text-green-500 ml-2" />
-                    </div>
-                    <div className="flex items-center gap-2 p-3 rounded-lg border bg-card text-sm opacity-50 cursor-not-allowed" title="Coming soon">
-                        <FileIcon className="h-4 w-4 text-blue-500" />
-                        <span>Scanned PDF (OCR)</span>
-                        <span className="text-xs bg-muted px-1.5 py-0.5 rounded">Soon</span>
-                    </div>
-                </div>
-            </div>
+
         </div>
     );
 }
