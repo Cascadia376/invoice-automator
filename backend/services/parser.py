@@ -155,15 +155,31 @@ CRITICAL INSTRUCTIONS FOR LINE ITEMS:
   * "Qty" or "Quantity" column
   * Number before "x" (e.g., "5 x Product" means quantity=5)
   * "Cases" or "Units" columns
-- If you see both "cases" and "units_per_case", calculate: quantity = cases × units_per_case
-- Pay close attention to decimal points in quantities and prices
-- Extract unit_cost (price per single unit) and amount (total line price) separately
+- **PACK SIZE / UNITS PER CASE**:
+  * Look for "Pack", "Size", "Btl/Case", or description like "12x750ml".
+  * Extract this into `units_per_case` (e.g., 12). Default to 1.0 if not found.
+- If you see both "cases" and "units_per_case", calculate: quantity = cases × units_per_case.
+- **COSTS**:
+  * `unit_cost`: Price per single bottle/can/unit.
+  * `case_cost`: Price per entire case. Extract if available, otherwise null.
+  * `amount`: Total line price (usually quantity * unit_cost OR cases * case_cost).
+- Pay close attention to decimal points in quantities and prices.
 - **PO NUMBER**: Look specifically for "PO", "P.O.", "Purchase Order", or "Order #". Extract this into the `po_number` field.
 - **LIQUOR INDUSTRY DEPOSITS**: Search aggressively for Bottle Deposits (Btl Dep), Recycling Fees (Env Fee), and Container Deposits. 
 - If these are hidden in line items, extract them. If they are in the summary, extract them.
 - If you find multiple different fees (e.g. Deposit + Recycling), SUM THEM into the `deposit_amount` field.
 - If a line item description contains "Deposit" or "Recycling", but has a negative or small value, treat it as a deposit component.
 - **MATH VALIDATION**: Strictly ensure that `quantity * unit_cost = amount` for every line item. If the invoice shows a total that doesn't match the calculation, flag it in the description or notes.
+- **CLASSIFICATION**: Classify each item into one of these EXACT categories based on its description:
+  * "BEER" (Beer, Kegs, Malt)
+  * "WINE" (Red, White, Rose, Sparkling, Fortified)
+  * "LIQUOR" (Spirits, Vodka, Whiskey, Rum, Gin, Tequila, Liqueurs)
+  * "COOLERS" (RTD, Seltzers, Pre-mixed drinks)
+  * "CIDER" (Apple/Pear Cider)
+  * "TOBACCO" (Cigarettes, Cigars, Vapes)
+  * "LOTTERY" (Lotto tickets)
+  * "MISC" (Deposits, Freight, Supplies, adjusters)
+  * "MIX & CONFEC" (Non-alc, Soda, Juice, Snacks, Garnish)
 
 Return a JSON object with two keys: "data" and "template".
 
@@ -185,8 +201,10 @@ Return a JSON object with two keys: "data" and "template".
         "units_per_case": "float (default 1.0 if not specified)",
         "cases": "float (default 0.0 if not specified)",
         "quantity": "float (REQUIRED - extract carefully)",
+        "case_cost": "float or null (price per case if available)",
         "unit_cost": "float (price per unit)",
         "amount": "float (total for this line)",
+        "category_gl_code": "str (One of: BEER, WINE, LIQUOR, COOLERS, CIDER, TOBACCO, LOTTERY, MISC, MIX & CONFEC)",
         "confidence_score": "float (0.0-1.0, where 1.0 = very confident, 0.5 = uncertain, 0.0 = guessing)"
     }]
 }

@@ -1,54 +1,59 @@
-AI Invoice Processor — PRD (Updated)
+AI Invoice Processor — PRD (Liquor Retail Internal Tool)
 
 Scope
-- Current product: ingest invoices (upload/email-ready), extract with hybrid parser (templates + LLM/vision + Textract fallback), human review/edit, CSV export, and vendor/GL management. No billing/subscription flows and no third‑party accounting push (QuickBooks/Stripe removed).
+- Internal tool for liquor retail environment. Use case: "User Testing with one store".
+- Focus: Speed up invoice entry into POS and accounting systems.
+- Key Value: Eliminate manual entry, robust error checking (price changes, new items), and formatted exports.
 
 Problem & Opportunity
-- SMB finance teams waste hours re‑keying invoice data into spreadsheets/accounting tools; errors create reconciliation risk.
-- Opportunity: fast, accurate extraction with a tight review loop and export-ready data to drop into any stack.
+- Current State: Manual entry of liquor invoices is time-consuming and prone to errors (wrong costs, missed new items, fat-finger qty).
+- Opportunity: Automate extraction from PDF/scans, validate against rules, and produce import-ready files.
 
 Goals & KPIs
-- Time saved: ≥70% vs manual entry (target: ≤2.4h/week from 8h).
-- Extraction accuracy: ≥90% native PDFs, ≥80% scanned.
-- Review throughput: ≥10 invoices/day in pilot; >50% invoices auto-approve once confidence improves.
-- Churn proxy: N/A (no billing live); measure weekly active reviewers and exports.
+- Speed: Reduce invoice processing time by 75% (Target: < 2 mins per invoice).
+- Data Integrity: 100% capture of Invoice Number, Date, Total, and Line Item Costs.
+- Error Detection: Alert on >95% of "toxic" changes (cost increases > threshold, unknown SKUs).
+- Export Accuracy: 0 formatting errors for POS import files.
 
-Users & Jobs
-- SMB operators/bookkeepers: upload/review/export clean invoice data.
-- Agencies/outsourced bookkeeping: multi-tenant handling with org scoping, GL categories, vendor normalization.
+Users
+- Inventory Manager / Receiver: Uploads invoices, reviews exceptions, exports data.
+- Accountant: Verifies GL coding (mapped from Category/SKU).
 
 Core Workflow (MVP)
-1) Upload PDF (native preferred; Textract + vision fallback for scans).
-2) Extract: vendor, invoice number, dates, totals, line items with confidence.
-3) Review & edit: validation hints, highlights, optimistic save.
-4) Export: CSV with configurable columns/headers; presigned PDF access.
+1. Ingest: Upload PDF invoices (Email ingestion planned for v2).
+2. Extract: Hybrid parsing (LLM + Vision) to get Headers (Vendor, Invoice #, Date, Terms) and Line Items (SKU, Description, Qty, Case Cost, Unit Cost, Ext Price).
+3. Validate:
+   - Check Calculated Total (Qty * Cost) matches Line Total.
+   - Check Line Totals sum to Invoice Subtotal.
+   - *Future*: Compare against master product list for Cost Variance and New Item detection.
+4. Review: UI highlights low-confidence fields and Validation Errors. User corrects data.
+5. Export: Generate CSV/Excel formatted specifically for:
+   - POS System (Inventory Receiving)
+   - Accounting System (Bills)
 
-Out of Scope (removed)
-- QuickBooks/Xero push flows.
-- Stripe billing/checkout, subscription states on Organization.
+Functional Requirements
+- Auth: Secure login (Supabase).
+- Ingestion: Drag-and-drop UI for PDFs/Images.
+- Parsing:
+    - Extract Vendor Product Code (SKU) - Critical for POS matching.
+    - Handle multi-page liquor invoices.
+    - Normalize "Case Cost" vs "Unit Cost" (Liquor invoices often vary).
+- Data Model:
+    - Invoices: id, status (uploaded, review, approved), vendor_id, dates, totals.
+    - Line Items: invoice_id, raw_desc, sku, qty, pack_size, cost, total.
+- Validation Rules (The "Robust Error Checking"):
+    - Math checks (Qty * Cost = Total).
+    - Invoice Footing (Sum lines = Subtotal).
+    - Confidence score threshold alerts.
+- Error Tracking / Analytics:
+    - Log every "validation error" triggered.
+    - Dashboard showing "Invoices with Issues" vs "Clean Invoices".
+- Export:
+    - Configurable mapping for POS columns (e.g. "Vendor Stock No" -> "SKU", "Case Cost" -> "Cost").
 
-Functional Requirements (current)
-- Auth: Supabase JWT via backend `auth.py` (service API key path remains for scripts).
-- Ingestion: `/api/invoices/upload` accepts PDF → stores in S3 → parses → persists invoice + line items.
-- Review: list, detail, update, validation service for anomalies, feedback endpoint to refine templates.
-- Vendors/GL: CRUD for vendors and GL categories; SKU→GL lookup.
-- Export: `/api/invoices/{id}/export/csv` with selectable headers.
-- Demo: `/api/seed/demo` generates a sample invoice.
+Roadmap (MVP to Pilot)
+- [ ] Phase 1: Ingestion & Extraction Accuracy (Get the data out).
+- [ ] Phase 2: Review Interface & Basic Math Validation (Make it verifiable).
+- [ ] Phase 3: Export Formatter (Make it usable).
+- [ ] Phase 4: Pilot Launch (One store user testing).
 
-Non‑Functional
-- Multi-tenant isolation by `organization_id`.
-- Storage: S3 for PDFs; presigned URLs for access.
-- DB: Postgres/SQLite via SQLAlchemy; tables auto-created.
-- Security: JWT auth required on APIs; CORS configurable (currently permissive for MVP).
-
-Roadmap (near-term)
-- Harden auth guard UX (Supabase) and session handling in frontend.
-- Tighten CORS and upload validation (size/type).
-- Improve template concurrency (per-request temp dirs).
-- Add duplicate detection and better validation heuristics.
-- Optional future: reintroduce accounting connectors behind feature flags.
-
-Success Criteria (pilot)
-- ≥90% accuracy on native PDFs across top vendors.
-- Review-to-export cycle <2 minutes for typical invoice.
-- Zero cross-org data leaks in vendor stats/queries.

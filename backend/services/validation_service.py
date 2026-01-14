@@ -31,7 +31,23 @@ def validate_invoice(db: Session, invoice: models.Invoice) -> Dict[str, Any]:
         # No history, cannot validate
         return warnings
 
-    # --- Global Validation (Total Amount) ---
+    # --- Deterministic Validation (Math Checks) ---
+    
+    # 1. Footing Check (Lines Sum vs Subtotal)
+    # Use subtotal if available, otherwise total_amount - tax - deposit
+    target_total = invoice.subtotal if (invoice.subtotal and invoice.subtotal > 0) else invoice.total_amount
+    
+    calc_subtotal = sum([item.amount for item in invoice.line_items if item.amount is not None])
+    
+    if target_total and target_total > 0:
+        diff = abs(calc_subtotal - target_total)
+        # Allow small rounding tolerance (e.g. 0.05)
+        if diff > 0.05:
+            warnings["global_warnings"].append(
+                f"Subtotal Mismatch: Line items sum to ${calc_subtotal:,.2f}, but invoice says ${target_total:,.2f} (Diff: ${diff:,.2f})"
+            )
+
+    # --- Historical/Statistical Validation ---
     historical_totals = [inv.total_amount for inv in history_query if inv.total_amount]
     if historical_totals:
         avg_total = statistics.mean(historical_totals)
@@ -71,6 +87,12 @@ def validate_invoice(db: Session, invoice: models.Invoice) -> Dict[str, Any]:
             
         item_warnings = []
         
+        # --- Deterministic Math Check ---
+        if item.quantity is not None and item.unit_cost is not None and item.amount is not None:
+             expected = item.quantity * item.unit_cost
+             if abs(expected - item.amount) > 0.03: # 3 cents tolerance
+                 item_warnings.append(f"Math Error: {item.quantity} x ${item.unit_cost:.2f} = ${expected:.2f}, but line says ${item.amount:.2f}")
+
         # Check if new item (never seen before in last 20 invoices)
         if item_key not in item_stats:
             # Only flag as new if we actually have some history

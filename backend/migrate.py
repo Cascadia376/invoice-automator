@@ -48,7 +48,20 @@ def migrate():
             except Exception as e:
                 print(f"Note: Could not add {col_name} (likely already exists): {e}")
 
-        # 2. Add organization_id to all relevant tables for multi-tenancy
+        # 2. Line Items Table Extras
+        line_item_columns = [
+            ("case_cost", "FLOAT")
+        ]
+        
+        for col_name, col_type in line_item_columns:
+            try:
+                print(f"Adding {col_name} to line_items...")
+                conn.execute(text(f"ALTER TABLE line_items ADD COLUMN {col_name} {col_type}"))
+                conn.commit()
+            except Exception as e:
+                print(f"Note: Could not add {col_name} (likely already exists): {e}")
+
+        # 3. Add organization_id to all relevant tables for multi-tenancy
         tables_to_migrate = [
             "invoices", 
             "line_items", # Added line_items for direct filtering support

@@ -18,6 +18,33 @@ def get_supabase() -> Client:
         _supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
     return _supabase
 
+def normalize_category(raw_category: str) -> str:
+    if not raw_category:
+        return "MISC"
+    
+    cat = raw_category.upper()
+    
+    if cat in ["BEER", "WINE", "LIQUOR", "COOLERS", "CIDER", "TOBACCO", "LOTTERY", "MISC", "MIX & CONFEC"]:
+        return cat
+        
+    # Mappings
+    if any(x in cat for x in ["SPIRIT", "VODKA", "WHISKEY", "GIN", "RUM", "TEQUILA", "LIQUEUR"]):
+        return "LIQUOR"
+    if any(x in cat for x in ["KEG", "DRAUGHT", "MALT"]):
+        return "BEER"
+    if any(x in cat for x in ["RED", "WHITE", "ROSE", "SPARKLING", "FORTIFIED"]):
+        return "WINE"
+    if any(x in cat for x in ["RTD", "READY", "SELTZER"]):
+        return "COOLERS"
+    if "CIGAR" in cat or "VAPE" in cat:
+        return "TOBACCO"
+    if "DEPOSIT" in cat or "CONTAINER" in cat or "FREIGHT" in cat:
+        return "MISC"
+    if any(x in cat for x in ["MIX", "SODA", "JUICE", "WATER", "GARNISH", "SNACK", "CONFEC"]):
+        return "MIX & CONFEC"
+        
+    return "MISC"
+
 def get_product_by_sku(db: Session, org_id: str, sku: str) -> Optional[models.Product]:
     """Get product from local DB, fallback to Supabase."""
     # 1. Try local cache
@@ -36,6 +63,11 @@ def get_product_by_sku(db: Session, org_id: str, sku: str) -> Optional[models.Pr
         
         if response.data:
             sb_prod = response.data[0]
+            
+            # Normalize Category
+            raw_cat = sb_prod.get("category")
+            normalized_cat = normalize_category(raw_cat)
+            
             # 3. Save to local cache
             import uuid
             new_prod = models.Product(
@@ -43,7 +75,7 @@ def get_product_by_sku(db: Session, org_id: str, sku: str) -> Optional[models.Pr
                 organization_id=org_id,
                 sku=sb_prod.get("sku"),
                 name=sb_prod.get("name"),
-                category=sb_prod.get("category"),
+                category=normalized_cat,
                 units_per_case=float(sb_prod.get("units_per_case", 1.0)),
                 average_cost=float(sb_prod.get("average_cost", 0.0)),
                 last_cost=float(sb_prod.get("last_cost", 0.0)),

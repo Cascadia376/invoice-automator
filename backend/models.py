@@ -41,6 +41,7 @@ class LineItem(Base):
     units_per_case = Column(Float, default=1.0)
     cases = Column(Float, default=0.0)
     quantity = Column(Float)
+    case_cost = Column(Float, nullable=True)
     unit_cost = Column(Float)
     amount = Column(Float)
     category_gl_code = Column(String, nullable=True)

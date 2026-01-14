@@ -16,6 +16,20 @@ def get_gl_categories(
     ctx: auth.UserContext = Depends(auth.get_current_user)
 ):
     categories = db.query(models.GLCategory).filter(models.GLCategory.organization_id == ctx.org_id).all()
+    
+    if not categories:
+        # Default seed for new organizations
+        defaults = ["BEER", "WINE", "LIQUOR", "COOLERS", "CIDER", "TOBACCO", "LOTTERY", "MISC", "MIX & CONFEC"]
+        return [
+            models.GLCategory(
+                id=str(uuid.uuid4()), 
+                organization_id=ctx.org_id, 
+                code=c, 
+                name=c, 
+                full_name=c
+            ) for c in defaults
+        ]
+        
     return categories
 
 @router.post("/api/gl-categories", response_model=schemas.GLCategory)

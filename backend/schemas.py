@@ -1,5 +1,5 @@
 from pydantic import BaseModel, validator
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 
 def to_camel(string: str) -> str:
@@ -11,6 +11,7 @@ class LineItemBase(BaseModel):
     units_per_case: float = 1.0
     cases: float = 0.0
     quantity: float
+    case_cost: Optional[float] = None
     unit_cost: float
     amount: float
     category_gl_code: Optional[str] = None
@@ -92,6 +93,7 @@ class Invoice(InvoiceBase):
     id: str
     created_at: datetime
     line_items: List[LineItem] = []
+    category_summary: Optional[Dict[str, float]] = None
 
     model_config = {
         "from_attributes": True,

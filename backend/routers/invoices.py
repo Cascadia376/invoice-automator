@@ -11,7 +11,7 @@ import fitz # PyMuPDF
 
 import models, schemas, auth
 from database import get_db
-from services import parser, textract_service, vendor_service, product_service, storage, validation_service
+from services import parser, textract_service, vendor_service, product_service, storage, validation_service, export_service
 from services.textract_service import parse_float
 
 router = APIRouter(
@@ -123,6 +123,7 @@ async def upload_invoice(
                 units_per_case=parse_float(item.get("units_per_case", 1.0)),
                 cases=parse_float(item.get("cases", 0.0)),
                 quantity=parse_float(item.get("quantity", 1.0)),
+                case_cost=parse_float(item.get("case_cost")) if item.get("case_cost") is not None else None,
                 unit_cost=parse_float(item.get("unit_cost", 0.0)),
                 amount=parse_float(item.get("amount", 0.0)),
                 category_gl_code=category_gl_code,
@@ -186,6 +187,15 @@ def read_invoice(
     
     if invoice.file_url and not invoice.file_url.startswith("http"):
          invoice.file_url = storage.get_presigned_url(invoice.file_url)
+
+    # Calculate Category Summary
+    summary = {}
+    for item in invoice.line_items:
+        cat = item.category_gl_code or "Uncategorized"
+        summary[cat] = summary.get(cat, 0.0) + (item.amount or 0.0)
+    
+    # Round totals
+    invoice.category_summary = {k: round(v, 2) for k, v in summary.items()}
          
     return invoice
 
@@ -500,50 +510,13 @@ def export_invoice_csv(
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    all_columns_map = {
-        "Invoice Number": lambda i, item: i.invoice_number,
-        "Date": lambda i, item: i.date,
-        "Vendor": lambda i, item: i.vendor_name,
-        "SKU": lambda i, item: item.sku,
-        "Description": lambda i, item: item.description,
-        "Units/Case": lambda i, item: item.units_per_case,
-        "Cases": lambda i, item: item.cases,
-        "Quantity": lambda i, item: item.quantity,
-        "Unit Cost": lambda i, item: item.unit_cost,
-        "Total": lambda i, item: item.amount,
-        "Category/GL Code": lambda i, item: item.category_gl_code
-    }
-    
-    header_map = {k: k for k in all_columns_map.keys()}
-    selected_keys = list(all_columns_map.keys())
-
-    if columns:
-        try:
-            import json
-            custom_map = json.loads(columns)
-            if isinstance(custom_map, dict):
-                valid_map = {k: v for k, v in custom_map.items() if k in all_columns_map}
-                if valid_map:
-                    selected_keys = list(valid_map.keys())
-                    header_map = valid_map
-        except json.JSONDecodeError:
-            requested_keys = columns.split(",")
-            valid_keys = [k for k in requested_keys if k in all_columns_map]
-            if valid_keys:
-                selected_keys = valid_keys
-        row = [all_columns_map[k](invoice, item) for k in selected_keys]
-        writer.writerow(row)
-        
-    output.seek(0)
+    csv_content = export_service.generate_csv(invoice)
     
     headers = {
         'Content-Disposition': f'attachment; filename="invoice_{invoice.invoice_number or invoice_id}.csv"'
     }
     
-    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers=headers)
+    return StreamingResponse(iter([csv_content]), media_type="text/csv", headers=headers)
 
 @router.get("/{invoice_id}/export/excel")
 def export_invoice_excel(
