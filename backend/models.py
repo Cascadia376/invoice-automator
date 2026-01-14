@@ -46,6 +46,10 @@ class LineItem(Base):
     amount = Column(Float)
     category_gl_code = Column(String, nullable=True)
     confidence_score = Column(Float, default=1.0)
+    issue_type = Column(String, nullable=True) # breakage, shortship, overship, misship
+    issue_status = Column(String, default="open", nullable=True) # open, reported, resolved, closed
+    issue_description = Column(String, nullable=True)
+    issue_notes = Column(String, nullable=True)
 
     invoice = relationship("Invoice", back_populates="line_items")
 

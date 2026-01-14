@@ -16,6 +16,10 @@ class LineItemBase(BaseModel):
     amount: float
     category_gl_code: Optional[str] = None
     confidence_score: float = 1.0
+    issue_type: Optional[str] = None # breakage, shortship, overship, misship
+    issue_status: Optional[str] = "open" # open, reported, resolved, closed
+    issue_description: Optional[str] = None
+    issue_notes: Optional[str] = None
     
     model_config = {
         "populate_by_name": True,

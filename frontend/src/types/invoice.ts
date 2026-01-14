@@ -11,6 +11,10 @@ export interface LineItem {
   amount: number;
   categoryGlCode?: string;
   confidenceScore: number;
+  issueType?: 'breakage' | 'shortship' | 'overship' | 'misship' | null;
+  issueStatus?: 'open' | 'reported' | 'resolved' | 'closed' | null;
+  issueDescription?: string | null;
+  issueNotes?: string | null;
 }
 
 export interface Invoice {

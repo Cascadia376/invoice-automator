@@ -331,6 +331,48 @@ export default function InvoiceReview() {
 
               <button
                 onClick={async () => {
+                  if (!invoice) return;
+                  try {
+                    const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+                    const token = await getToken();
+
+                    const response = await fetch(`${API_BASE}/api/invoices/${invoice.id}/export/ldb`, {
+                      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+                    });
+
+                    if (!response.ok) throw new Error("Report generation failed");
+
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = `LDB_Report.xlsx`;
+                    if (contentDisposition) {
+                      const matches = /filename="?([^"]+)"?/.exec(contentDisposition);
+                      if (matches && matches[1]) filename = matches[1];
+                    }
+
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+
+                    toast.success("LDB Report downloaded");
+                  } catch (error: any) {
+                    toast.error("Failed to download report");
+                  }
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+              >
+                <FileText className="h-4 w-4" />
+                <span>LDB Report</span>
+              </button>
+
+              <button
+                onClick={async () => {
                   const savedColumns = localStorage.getItem("csv_export_columns");
                   const savedConfig = localStorage.getItem("csv_export_config");
 

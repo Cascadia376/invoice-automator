@@ -28,6 +28,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn, formatCurrency } from "@/lib/utils";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Flag, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
 
 const lineItemSchema = z.object({
   sku: z.string().optional(),
@@ -39,6 +54,10 @@ const lineItemSchema = z.object({
   amount: z.coerce.number().min(0, "Amount must be positive"),
   categoryGlCode: z.string().optional(),
   confidenceScore: z.number().default(1.0),
+  issueType: z.enum(['breakage', 'shortship', 'overship', 'misship']).nullable().optional(),
+  issueStatus: z.enum(['open', 'reported', 'resolved', 'closed']).nullable().optional(),
+  issueDescription: z.string().optional(),
+  issueNotes: z.string().optional(),
 });
 
 const invoiceSchema = z.object({
@@ -81,6 +100,7 @@ const AVAILABLE_COLUMNS = [
   { id: "unitCost", label: "Unit Cost" },
   { id: "amount", label: "Total" },
   { id: "categoryGlCode", label: "Category/GL" },
+  { id: "issue", label: "Issues" },
 ];
 
 export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: InvoiceDataEditorProps) {
@@ -125,7 +145,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
       const saved = localStorage.getItem("invoice-editor-columns");
       if (saved) return JSON.parse(saved);
     }
-    return ["sku", "description", "unitsPerCase", "cases", "quantity", "unitCost", "amount", "categoryGlCode"];
+    return ["sku", "description", "unitsPerCase", "cases", "quantity", "unitCost", "amount", "categoryGlCode", "issue"];
   });
 
   const toggleColumn = (columnId: string) => {
@@ -171,7 +191,11 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
         unitCost: item.unitCost,
         amount: item.amount,
         categoryGlCode: item.categoryGlCode || '',
-        confidenceScore: item.confidenceScore || 1.0
+        confidenceScore: item.confidenceScore || 1.0,
+        issueType: item.issueType || null,
+        issueStatus: item.issueStatus || 'open',
+        issueDescription: item.issueDescription || '',
+        issueNotes: item.issueNotes || ''
       }))
     },
   });
@@ -203,7 +227,11 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
         unitCost: item.unitCost,
         amount: item.amount,
         categoryGlCode: item.categoryGlCode || '',
-        confidenceScore: item.confidenceScore || 1.0
+        confidenceScore: item.confidenceScore || 1.0,
+        issueType: item.issueType || null,
+        issueStatus: item.issueStatus || 'open',
+        issueDescription: item.issueDescription || '',
+        issueNotes: item.issueNotes || ''
       }))
     });
   }, [data.id, reset]);
@@ -222,7 +250,11 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
         unitCost: 0,
         amount: 0,
         categoryGlCode: "",
-        confidenceScore: 1.0
+        confidenceScore: 1.0,
+        issueType: null,
+        issueStatus: 'open',
+        issueDescription: "",
+        issueNotes: ""
       },
     ];
     setValue("lineItems", newItems);
@@ -249,7 +281,11 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
         unitCost: item.unitCost || 0,
         amount: item.amount || 0,
         categoryGlCode: item.categoryGlCode,
-        confidenceScore: item.confidenceScore || 1.0
+        confidenceScore: item.confidenceScore || 1.0,
+        issueType: item.issueType,
+        issueStatus: item.issueStatus as any,
+        issueDescription: item.issueDescription,
+        issueNotes: item.issueNotes
       }))
     });
   };
@@ -477,6 +513,9 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                     {visibleColumns.includes('categoryGlCode') && (
                       <TableHead className="min-w-[150px] h-9 py-1 text-xs">Category/GL</TableHead>
                     )}
+                    {visibleColumns.includes('issue') && (
+                      <TableHead className="w-[50px] h-9 py-1 text-xs text-center">Issue</TableHead>
+                    )}
 
                     <TableHead className="w-[50px] h-9 py-1"></TableHead>
                   </TableRow>
@@ -588,6 +627,87 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                             placeholder="Select..."
                             list="gl-categories"
                           />
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes('issue') && (
+                        <TableCell className="p-1 text-center">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="ghost" size="sm" className={cn("h-7 w-7 p-0", item.issueType ? "text-red-500" : "text-gray-300 hover:text-gray-500")}>
+                                {item.issueType ? <Flag className="h-4 w-4 fill-current" /> : <Flag className="h-4 w-4" />}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 p-4" align="end">
+                              <div className="grid gap-4">
+                                <div className="space-y-2">
+                                  <h4 className="font-medium leading-none">Issue Tracking</h4>
+                                  <p className="text-sm text-muted-foreground">Flag this item for follow-up.</p>
+                                </div>
+                                <div className="grid gap-2">
+                                  <div className="grid grid-cols-3 items-center gap-4">
+                                    <Label htmlFor={`issue-type-${index}`}>Type</Label>
+                                    <Select
+                                      value={item.issueType || "none"}
+                                      onValueChange={(val) => {
+                                        setValue(`lineItems.${index}.issueType`, val === "none" ? null : val as any);
+                                        if (val === "none") {
+                                          setValue(`lineItems.${index}.issueStatus`, null);
+                                        } else if (!item.issueStatus) {
+                                          setValue(`lineItems.${index}.issueStatus`, "open");
+                                        }
+                                        handleFieldChange();
+                                      }}
+                                    >
+                                      <SelectTrigger className="col-span-2 h-8">
+                                        <SelectValue placeholder="None" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="none">None</SelectItem>
+                                        <SelectItem value="breakage">Breakage</SelectItem>
+                                        <SelectItem value="shortship">Shortship</SelectItem>
+                                        <SelectItem value="overship">Overship</SelectItem>
+                                        <SelectItem value="misship">Mis-ship</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  {item.issueType && (
+                                    <>
+                                      <div className="grid grid-cols-3 items-center gap-4">
+                                        <Label>Status</Label>
+                                        <Select
+                                          value={item.issueStatus || "open"}
+                                          onValueChange={(val) => {
+                                            setValue(`lineItems.${index}.issueStatus`, val as any);
+                                            handleFieldChange();
+                                          }}
+                                        >
+                                          <SelectTrigger className="col-span-2 h-8">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="open">Open</SelectItem>
+                                            <SelectItem value="reported">Reported</SelectItem>
+                                            <SelectItem value="resolved">Resolved</SelectItem>
+                                            <SelectItem value="closed">Closed</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="grid gap-2">
+                                        <Label>Notes</Label>
+                                        <Textarea
+                                          className="h-20 resize-none text-xs"
+                                          placeholder="Details about the issue (e.g. Broken bottle count)..."
+                                          {...register(`lineItems.${index}.issueNotes`, {
+                                            onChange: handleFieldChange
+                                          })}
+                                        />
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         </TableCell>
                       )}
                       <TableCell className="p-1">

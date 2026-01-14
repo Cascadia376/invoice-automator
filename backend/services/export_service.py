@@ -25,3 +25,61 @@ def generate_csv(invoice: Invoice) -> str:
         ])
         
     return output.getvalue()
+
+def generate_ldb_report(invoice: Invoice) -> bytes:
+    """
+    Generates an LDB Issue Report (Excel) for items with issues.
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "LDB Issues"
+    
+    headers = ["Invoice #", "Date", "SKU", "Description", "Issue Type", "Status", "Notes", "Qty", "Amount"]
+    ws.append(headers)
+    
+    # Style headers
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="36454F", end_color="36454F", fill_type="solid")
+    
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+        
+    has_issues = False
+    for item in invoice.line_items:
+        if item.issue_type: # Only include items with issues
+            has_issues = True
+            ws.append([
+                invoice.invoice_number or "UNKNOWN",
+                invoice.date or "",
+                item.sku or "",
+                item.description or "",
+                item.issue_type,
+                item.issue_status or "open",
+                item.issue_notes or item.issue_description or "",
+                item.quantity,
+                item.amount
+            ])
+            
+    if not has_issues:
+        ws.append(["No issues flagged on this invoice."])
+        
+    # Auto-adjust column widths
+    for col in ws.columns:
+        max_length = 0
+        column = col[0].column_letter # Get the column name
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = (max_length + 2)
+        ws.column_dimensions[column].width = adjusted_width
+        
+    output = io.BytesIO()
+    wb.save(output)
+    return output.getvalue()

@@ -573,6 +573,37 @@ def export_invoice_excel(
             "Content-Disposition": f"attachment; filename=\"{filename}\"",
             "Access-Control-Expose-Headers": "Content-Disposition"
         }
+        }
+    )
+
+@router.get("/{invoice_id}/export/ldb")
+def export_invoice_ldb_report(
+    invoice_id: str, 
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    invoice = db.query(models.Invoice).filter(
+        models.Invoice.id == invoice_id,
+        models.Invoice.organization_id == ctx.org_id
+    ).first()
+    
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    excel_content = export_service.generate_ldb_report(invoice)
+    
+    # Filename: LDB_Issue_Report_[Invoice#]_[Date].xlsx
+    safe_invoice = "".join(x for x in (invoice.invoice_number or "Unknown") if x.isalnum() or x in "-_").strip()
+    safe_date = invoice.date or datetime.now().strftime("%Y-%m-%d")
+    filename = f"LDB_Issue_Report_{safe_invoice}_{safe_date}.xlsx"
+    
+    return StreamingResponse(
+        io.BytesIO(excel_content),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename=\"{filename}\"",
+            "Access-Control-Expose-Headers": "Content-Disposition"
+        }
     )
 
 @router.post("/export/excel/bulk")
