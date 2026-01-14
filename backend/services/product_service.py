@@ -7,8 +7,8 @@ import models
 from datetime import datetime
 
 # Configuration
-SUPABASE_URL = "https://wobndqnfqtumbyxxtojl.supabase.co"
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "sb_secret_wCoX-veuddkQ-S-23vmadA_fkvQ-bz_")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
 _supabase: Optional[Client] = None
 
