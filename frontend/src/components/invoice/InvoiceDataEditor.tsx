@@ -252,7 +252,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
         categoryGlCode: "",
         confidenceScore: 1.0,
         issueType: null,
-        issueStatus: 'open',
+        issueStatus: 'open' as const,
         issueDescription: "",
         issueNotes: ""
       },

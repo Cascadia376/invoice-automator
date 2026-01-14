@@ -20,7 +20,7 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex="https://invoice-automator-.*-cascadia376\.vercel\.app|https://cascadia-.*\.vercel\.app", # Support preview deployments
+    allow_origin_regex="https://.*\.vercel\.app", # Allow all Vercel subdomains (previews + prod)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
