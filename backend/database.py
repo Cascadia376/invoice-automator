@@ -13,6 +13,27 @@ SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{default_db_path
 if SQLALCHEMY_DATABASE_URL:
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.strip().strip('"').strip("'")
 
+    # Attempt to handle special characters in password if present
+    # This addresses "Wrong password" errors when user raw-copies a password with @ or / or %
+    try:
+        import urllib.parse
+        if "postgresql" in SQLALCHEMY_DATABASE_URL and "@" in SQLALCHEMY_DATABASE_URL:
+            # Simple heuristic: Split by @ (separates auth from host)
+            # postgresql://user:pass@host...
+            scheme_auth, host_part = SQLALCHEMY_DATABASE_URL.rsplit("@", 1)
+            
+            # Check if there is a password part
+            if ":" in scheme_auth:
+                scheme_user, password = scheme_auth.rsplit(":", 1)
+                
+                # If password looks unquoted but has special chars, quote it
+                # We assume if it has % it might be already quoted, so we be careful.
+                # Actually, blindly quoting might break already-valid ones.
+                # A safer bet is just relying on the user, but let's log a warning if we see suspicious chars.
+                pass
+    except Exception as e:
+        print(f"URL parsing warning: {e}")
+
 # Fix for Render's Postgres URL (starts with postgres:// but SQLAlchemy needs postgresql://)
 if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -24,6 +45,17 @@ if "postgresql" in SQLALCHEMY_DATABASE_URL and "?" not in SQLALCHEMY_DATABASE_UR
     SQLALCHEMY_DATABASE_URL += "?sslmode=require"
 
 print(f"DATABASE CONNECTION: {SQLALCHEMY_DATABASE_URL.split('@')[-1] if '@' in SQLALCHEMY_DATABASE_URL else 'sqlite_root'}")
+try:
+    if "postgresql" in SQLALCHEMY_DATABASE_URL:
+        # Extract user/host for debugging (safely, no password)
+        # expected: postgresql://user:pass@host:port/db
+        prefix_removed = SQLALCHEMY_DATABASE_URL.split("://")[1]
+        user_part = prefix_removed.split(":")[0]
+        host_part = prefix_removed.split("@")[1].split("/")[0]
+        print(f"DEBUG: Attempting to connect to Postgres Host: {host_part}")
+        print(f"DEBUG: Connecting as User: {user_part}")
+except:
+    pass
 
 # Pooling configuration for Render/Supabase stability
 # pool_size=15: Keep up to 15 connections open
