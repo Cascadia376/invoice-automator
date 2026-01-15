@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -572,7 +572,6 @@ def export_invoice_excel(
         headers={
             "Content-Disposition": f"attachment; filename=\"{filename}\"",
             "Access-Control-Expose-Headers": "Content-Disposition"
-        }
         }
     )
 

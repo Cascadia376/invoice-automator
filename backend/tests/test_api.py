@@ -1,7 +1,10 @@
 def test_read_main(client):
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "version": "1.0.0"}
+    response_json = response.json()
+    assert response_json["status"] == "ok"
+    assert response_json["version"] == "1.0.0"
+    assert "database" in response_json
 
 def test_read_vendors_empty(client):
     response = client.get("/api/vendors")

@@ -11,7 +11,7 @@ export default function Dashboard() {
     const { getToken } = useAuth();
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState("");
-    const [statusFilter, setStatusFilter] = useState<'all' | 'needs_review' | 'approved' | 'failed'>('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'needs_review' | 'approved' | 'failed' | 'issue'>('all');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isLoading, setIsLoading] = useState(false);
 
@@ -24,7 +24,7 @@ export default function Dashboard() {
             statusFilter === 'all' ||
             invoice.status === statusFilter ||
             (statusFilter === 'approved' && invoice.status === 'pushed') ||
-            (statusFilter === ('issue' as any) && !!invoice.issueType);
+            (statusFilter === 'issue' && !!invoice.issueType);
 
         return matchesSearch && matchesStatus;
     });
@@ -221,9 +221,8 @@ export default function Dashboard() {
             <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-4">
                 <div
                     onClick={() => {
-                        // In a real app we'd filter by issueType. 
-                        // For now we'll just search for common issue keywords or filter if we have the field.
-                        setSearchTerm("issue");
+                        setStatusFilter('issue');
+                        setSearchTerm(""); // Clear search so we don't get stuck
                     }}
                     className="cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md"
                 >
@@ -338,8 +337,8 @@ export default function Dashboard() {
                         Rejected
                     </button>
                     <button
-                        onClick={() => setStatusFilter('issue' as any)}
-                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === ('issue' as any) ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        onClick={() => setStatusFilter('issue')}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === 'issue' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                         Issues
                     </button>

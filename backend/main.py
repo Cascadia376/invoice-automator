@@ -27,12 +27,11 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
-# Use absolute path for uploads to avoid CWD issues
+# Use absolute path for any remaining local temp needs (e.g. processing)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+# NOTE: Uploads are handled via S3/Storage Service. 
+# We do NOT mount a local static directory for uploads to prevent data loss on ephemeral filesystems (Render/App Runner).
 
 # Include Routers
 app.include_router(invoices.router)
