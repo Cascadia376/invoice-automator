@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 import uuid
 
+from datetime import datetime
 import models, schemas, auth
 from database import get_db
 
@@ -26,7 +27,8 @@ def get_gl_categories(
                 organization_id=ctx.org_id, 
                 code=c, 
                 name=c, 
-                full_name=c
+                full_name=c,
+                created_at=datetime.utcnow()
             ) for c in defaults
         ]
         
