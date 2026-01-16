@@ -93,6 +93,11 @@ def validate_invoice(db: Session, invoice: models.Invoice) -> Dict[str, Any]:
              if abs(expected - item.amount) > 0.03: # 3 cents tolerance
                  item_warnings.append(f"Math Error: {item.quantity} x ${item.unit_cost:.2f} = ${expected:.2f}, but line says ${item.amount:.2f}")
 
+        # --- LDB Specific: Case Quantity Consistency ---
+        if item.cases and item.units_per_case and item.quantity:
+             if abs((item.cases * item.units_per_case) - item.quantity) > 0.01:
+                 item_warnings.append(f"Case Qty Error: {item.cases} cases x {item.units_per_case} units/case = {item.cases * item.units_per_case}, but quantity is {item.quantity}")
+
         # Check if new item (never seen before in last 20 invoices)
         if item_key not in item_stats:
             # Only flag as new if we actually have some history

@@ -11,7 +11,7 @@ import fitz # PyMuPDF
 
 import models, schemas, auth
 from database import get_db
-from services import parser, textract_service, vendor_service, product_service, storage, validation_service, export_service, ldb_service
+from services import parser, textract_service, vendor_service, product_service, storage, validation_service, export_service, ldb_service, ldb_parser
 from services.textract_service import parse_float
 
 router = APIRouter(
@@ -49,10 +49,16 @@ async def upload_invoice(
         print(f"Uploading to S3: {s3_key}")
         storage.upload_file(temp_file_path, s3_key)
         
-        # Parse PDF (Textract will read from S3)
-        print("Starting PDF parsing...")
-        extracted_data = parser.extract_invoice_data(temp_file_path, ctx.org_id, s3_key=s3_key, s3_bucket=s3_bucket)
-        print("PDF parsing complete.")
+        # Parse File
+        if file_ext.lower() == ".xlsx":
+             print("Detected XLSX file, using LDB Parser...")
+             extracted_data = ldb_parser.parse_ldb_xlsx(temp_file_path)
+             extracted_data["vendor_name"] = "LDB"
+        else:
+             # Parse PDF (Textract will read from S3)
+             print("Starting PDF parsing...")
+             extracted_data = parser.extract_invoice_data(temp_file_path, ctx.org_id, s3_key=s3_key, s3_bucket=s3_bucket)
+             print("PDF parsing complete.")
         
         # Create or find vendor
         vendor_name = extracted_data.get("vendor_name", "Unknown Vendor")
