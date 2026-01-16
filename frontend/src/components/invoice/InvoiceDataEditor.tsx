@@ -63,7 +63,7 @@ const lineItemSchema = z.object({
 const invoiceSchema = z.object({
   invoiceNumber: z.string().min(1, "Invoice number required"),
   date: z.string().min(1, "Date required"),
-  dueDate: z.string().min(1, "Due date required"),
+  dueDate: z.string().optional(),
   vendorName: z.string().min(1, "Vendor name required"),
   vendorAddress: z.string().optional(),
   vendorEmail: z.string().email("Invalid email").optional().or(z.literal('')),
@@ -392,15 +392,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                     onFocus={() => onFieldFocus?.("date")}
                   />
                 </div>
-                <div>
-                  <Label htmlFor="dueDate" className="text-xs">Due Date</Label>
-                  <Input id="dueDate" type="date" {...register("dueDate")} className="mt-1 h-8 text-sm" onFocus={() => onFieldFocus?.("dueDate")} />
-                </div>
-                <div>
-                  <Label htmlFor="poNumber" className="text-xs">PO Number</Label>
-                  <Input id="poNumber" {...register("poNumber")} className="mt-1 h-8 text-sm" />
-                </div>
-                <div>
+                <div className="col-span-2">
                   {/* Currency hidden as it is always CAD */}
                 </div>
                 <div className="col-span-2">
@@ -432,14 +424,6 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                     className={cn("mt-1 h-8 text-sm", !watch("vendorName") && "border-red-300 bg-red-50")}
                     onFocus={() => onFieldFocus?.("vendorName")}
                   />
-                </div>
-                <div>
-                  <Label htmlFor="vendorAddress" className="text-xs">Address</Label>
-                  <Input id="vendorAddress" {...register("vendorAddress")} className="mt-1 h-8 text-sm" />
-                </div>
-                <div>
-                  <Label htmlFor="vendorEmail" className="text-xs">Email</Label>
-                  <Input id="vendorEmail" type="email" {...register("vendorEmail")} className="mt-1 h-8 text-sm" />
                 </div>
               </div>
             </div>

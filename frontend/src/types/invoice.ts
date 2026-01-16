@@ -24,7 +24,7 @@ export interface Invoice {
   vendorEmail?: string;
   vendorAddress?: string;
   date: string;
-  dueDate: string;
+  dueDate?: string;
   totalAmount: number;
   subtotal?: number;
   shippingAmount?: number;
