@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Trash2, Plus, ArrowUp, Settings2 } from "lucide-react";
+import { Trash2, Plus, ArrowUp, Settings2, AlertCircle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -19,6 +19,8 @@ import {
 import { Invoice } from "@/types/invoice";
 import { useEffect, useMemo, useState } from "react";
 import { useInvoice } from "@/context/InvoiceContext";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -54,10 +56,6 @@ const lineItemSchema = z.object({
   amount: z.coerce.number().min(0, "Amount must be positive"),
   categoryGlCode: z.string().optional(),
   confidenceScore: z.number().default(1.0),
-  issueType: z.enum(['breakage', 'shortship', 'overship', 'misship']).nullable().optional(),
-  issueStatus: z.enum(['open', 'reported', 'resolved', 'closed']).nullable().optional(),
-  issueDescription: z.string().optional(),
-  issueNotes: z.string().optional(),
 });
 
 const invoiceSchema = z.object({
@@ -75,7 +73,6 @@ const invoiceSchema = z.object({
   depositAmount: z.coerce.number().min(0).optional(),
   totalAmount: z.coerce.number().min(0, "Total required"),
   currency: z.string().min(1, "Currency required"),
-  issueType: z.enum(['breakage', 'shortship', 'overship', 'misship']).nullable().optional(),
   lineItems: z.array(lineItemSchema),
 });
 
@@ -105,7 +102,12 @@ const AVAILABLE_COLUMNS = [
 
 export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: InvoiceDataEditorProps) {
   const { glCategories } = useInvoice();
+  const { getToken } = useAuth();
   const safeLineItems = data.lineItems || [];
+
+  // Issues state
+  const [localIssues, setLocalIssues] = useState(data.issues || []);
+  const [isSubmittingIssue, setIsSubmittingIssue] = useState(false);
 
   // ... (rest of existing state)
 
@@ -181,7 +183,6 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
       depositAmount: data.depositAmount || 0,
       totalAmount: data.totalAmount,
       currency: data.currency,
-      issueType: data.issueType || null,
       lineItems: (data.lineItems || []).map(item => ({
         sku: item.sku || '',
         description: item.description,
@@ -192,10 +193,6 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
         amount: item.amount,
         categoryGlCode: item.categoryGlCode || '',
         confidenceScore: item.confidenceScore || 1.0,
-        issueType: item.issueType || null,
-        issueStatus: item.issueStatus || 'open',
-        issueDescription: item.issueDescription || '',
-        issueNotes: item.issueNotes || ''
       }))
     },
   });
@@ -217,7 +214,6 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
       depositAmount: data.depositAmount || 0,
       totalAmount: data.totalAmount,
       currency: data.currency,
-      issueType: data.issueType || null,
       lineItems: (data.lineItems || []).map(item => ({
         sku: item.sku || '',
         description: item.description,
@@ -228,13 +224,10 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
         amount: item.amount,
         categoryGlCode: item.categoryGlCode || '',
         confidenceScore: item.confidenceScore || 1.0,
-        issueType: item.issueType || null,
-        issueStatus: item.issueStatus || 'open',
-        issueDescription: item.issueDescription || '',
-        issueNotes: item.issueNotes || ''
       }))
     });
-  }, [data.id, reset]);
+    setLocalIssues(data.issues || []);
+  }, [data.id, reset, data.issues]);
 
   const lineItems = watch("lineItems");
 
@@ -251,10 +244,6 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
         amount: 0,
         categoryGlCode: "",
         confidenceScore: 1.0,
-        issueType: null,
-        issueStatus: 'open' as const,
-        issueDescription: "",
-        issueNotes: ""
       },
     ];
     setValue("lineItems", newItems);
@@ -282,12 +271,47 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
         amount: item.amount || 0,
         categoryGlCode: item.categoryGlCode,
         confidenceScore: item.confidenceScore || 1.0,
-        issueType: item.issueType,
-        issueStatus: item.issueStatus as any,
-        issueDescription: item.issueDescription,
-        issueNotes: item.issueNotes
       }))
     });
+  };
+
+  const handleCreateIssue = async (lineItemIndex: number, type: string, description: string) => {
+    setIsSubmittingIssue(true);
+    try {
+      const lineItemId = safeLineItems[lineItemIndex]?.id;
+      if (!lineItemId) {
+        toast.error("Can't report issue on unsaved line item. Save invoice first.");
+        return;
+      }
+
+      const token = await getToken();
+      const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+
+      const response = await fetch(`${API_BASE}/api/issues`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          invoice_id: data.id,
+          type,
+          description,
+          line_item_ids: [lineItemId]
+        })
+      });
+
+      if (!response.ok) throw new Error("Failed to create issue");
+
+      const newIssue = await response.json();
+      setLocalIssues(prev => [...prev, newIssue]);
+      toast.success("Issue reported successfully");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to report issue");
+    } finally {
+      setIsSubmittingIssue(false);
+    }
   };
 
   // Calculate Category Totals
@@ -396,18 +420,17 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                   {/* Currency hidden as it is always CAD */}
                 </div>
                 <div className="col-span-2">
-                  <Label htmlFor="issueType" className="text-xs">Invoice Issue (if any)</Label>
-                  <select
-                    id="issueType"
-                    {...register("issueType")}
-                    className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    <option value="">No Issue</option>
-                    <option value="breakage">Breakage</option>
-                    <option value="shortship">Shortship</option>
-                    <option value="overship">Overship</option>
-                    <option value="misship">Mis-ship</option>
-                  </select>
+                  <Label className="text-xs">Invoice Status</Label>
+                  <div className="mt-1">
+                    <Badge variant="outline" className={cn(
+                      "capitalize",
+                      data.status === 'approved' ? "bg-green-50 text-green-700 border-green-200" :
+                        data.status === 'needs_review' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                          "bg-blue-50 text-blue-700 border-blue-200"
+                    )}>
+                      {data.status.replace('_', ' ')}
+                    </Badge>
+                  </div>
                 </div>
               </div>
             </div>
@@ -617,79 +640,26 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                         <TableCell className="p-1 text-center">
                           <Popover>
                             <PopoverTrigger asChild>
-                              <Button variant="ghost" size="sm" className={cn("h-7 w-7 p-0", item.issueType ? "text-red-500" : "text-gray-300 hover:text-gray-500")}>
-                                {item.issueType ? <Flag className="h-4 w-4 fill-current" /> : <Flag className="h-4 w-4" />}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={cn(
+                                  "h-7 w-7 p-0",
+                                  localIssues.some(iss => iss.lineItems?.some(li => li.id === safeLineItems[index]?.id))
+                                    ? "text-red-500"
+                                    : "text-gray-300 hover:text-gray-500"
+                                )}
+                              >
+                                <Flag className="h-4 w-4" />
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-80 p-4" align="end">
-                              <div className="grid gap-4">
-                                <div className="space-y-2">
-                                  <h4 className="font-medium leading-none">Issue Tracking</h4>
-                                  <p className="text-sm text-muted-foreground">Flag this item for follow-up.</p>
-                                </div>
-                                <div className="grid gap-2">
-                                  <div className="grid grid-cols-3 items-center gap-4">
-                                    <Label htmlFor={`issue-type-${index}`}>Type</Label>
-                                    <Select
-                                      value={item.issueType || "none"}
-                                      onValueChange={(val) => {
-                                        setValue(`lineItems.${index}.issueType`, val === "none" ? null : val as any);
-                                        if (val === "none") {
-                                          setValue(`lineItems.${index}.issueStatus`, null);
-                                        } else if (!item.issueStatus) {
-                                          setValue(`lineItems.${index}.issueStatus`, "open");
-                                        }
-                                        handleFieldChange();
-                                      }}
-                                    >
-                                      <SelectTrigger className="col-span-2 h-8">
-                                        <SelectValue placeholder="None" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="none">None</SelectItem>
-                                        <SelectItem value="breakage">Breakage</SelectItem>
-                                        <SelectItem value="shortship">Shortship</SelectItem>
-                                        <SelectItem value="overship">Overship</SelectItem>
-                                        <SelectItem value="misship">Mis-ship</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  {item.issueType && (
-                                    <>
-                                      <div className="grid grid-cols-3 items-center gap-4">
-                                        <Label>Status</Label>
-                                        <Select
-                                          value={item.issueStatus || "open"}
-                                          onValueChange={(val) => {
-                                            setValue(`lineItems.${index}.issueStatus`, val as any);
-                                            handleFieldChange();
-                                          }}
-                                        >
-                                          <SelectTrigger className="col-span-2 h-8">
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="open">Open</SelectItem>
-                                            <SelectItem value="reported">Reported</SelectItem>
-                                            <SelectItem value="resolved">Resolved</SelectItem>
-                                            <SelectItem value="closed">Closed</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
-                                      <div className="grid gap-2">
-                                        <Label>Notes</Label>
-                                        <Textarea
-                                          className="h-20 resize-none text-xs"
-                                          placeholder="Details about the issue (e.g. Broken bottle count)..."
-                                          {...register(`lineItems.${index}.issueNotes`, {
-                                            onChange: handleFieldChange
-                                          })}
-                                        />
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
+                              <IssuePopoverContent
+                                lineItemId={safeLineItems[index]?.id}
+                                issues={localIssues.filter(iss => iss.lineItems?.some(li => li.id === safeLineItems[index]?.id))}
+                                onCreate={(type, desc) => handleCreateIssue(index, type, desc)}
+                                loading={isSubmittingIssue}
+                              />
                             </PopoverContent>
                           </Popover>
                         </TableCell>
@@ -846,5 +816,106 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
         </form>
       </ScrollArea>
     </Card >
+  );
+}
+
+function IssuePopoverContent({
+  lineItemId,
+  issues,
+  onCreate,
+  loading
+}: {
+  lineItemId: string,
+  issues: any[],
+  onCreate: (type: string, desc: string) => void,
+  loading: boolean
+}) {
+  const [type, setType] = useState<string>("");
+  const [description, setDescription] = useState("");
+
+  if (issues.length > 0) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h4 className="font-bold flex items-center gap-2 text-red-600">
+            <AlertCircle className="h-4 w-4" />
+            Reported Issue
+          </h4>
+          <Badge variant="outline" className="capitalize">{issues[0].status}</Badge>
+        </div>
+        <div className="space-y-1">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-tighter">Type</p>
+          <p className="text-sm capitalize">{issues[0].type.replace('_', ' ')}</p>
+        </div>
+        <div className="space-y-1">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-tighter">Details</p>
+          <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded border border-gray-100 italic">
+            "{issues[0].description}"
+          </p>
+        </div>
+        {issues[0].communications?.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-tighter">History</p>
+            <div className="max-h-24 overflow-y-auto space-y-2 pr-2">
+              {issues[0].communications.map((c: any) => (
+                <div key={c.id} className="text-xs border-l-2 border-blue-200 pl-2 py-0.5">
+                  <span className="font-medium text-blue-700">{c.type}:</span> {c.content}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => window.open('/issues', '_blank')}>
+          Manage in Tracker
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <h4 className="font-medium leading-none">Report an Issue</h4>
+        <p className="text-xs text-muted-foreground">Flag this item as broken, missing, etc.</p>
+      </div>
+      <div className="space-y-3">
+        <div className="space-y-1">
+          <Label className="text-[10px] uppercase font-bold text-gray-400">Issue Type</Label>
+          <Select onValueChange={setType} value={type}>
+            <SelectTrigger className="h-8">
+              <SelectValue placeholder="Select type..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="breakage">Breakage</SelectItem>
+              <SelectItem value="shortship">Short-shipped</SelectItem>
+              <SelectItem value="misship">Mis-shipped</SelectItem>
+              <SelectItem value="overship">Overshipped</SelectItem>
+              <SelectItem value="price_mismatch">Price Mismatch</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-[10px] uppercase font-bold text-gray-400">Description</Label>
+          <Textarea
+            placeholder="Detailed notes for the vendor..."
+            className="text-xs min-h-[80px]"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </div>
+        <Button
+          className="w-full text-xs"
+          size="sm"
+          disabled={!type || !description || loading}
+          onClick={() => {
+            onCreate(type, description);
+            setType("");
+            setDescription("");
+          }}
+        >
+          {loading ? "Reporting..." : "Report Issue"}
+        </Button>
+      </div>
+    </div>
   );
 }

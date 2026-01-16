@@ -1,4 +1,4 @@
-import { Home, Upload, Settings } from "lucide-react";
+import { Home, Upload, Settings, AlertCircle } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -8,6 +8,7 @@ export function AppHeader() {
     const { user, signOut } = useAuth();
     const navItems = [
         { icon: Home, label: "Dashboard", href: "/dashboard" },
+        { icon: AlertCircle, label: "Issue Tracker", href: "/issues" },
         { icon: Upload, label: "Upload", href: "/upload" },
         { icon: Settings, label: "Settings", href: "/settings" },
     ];

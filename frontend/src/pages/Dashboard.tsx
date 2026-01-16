@@ -24,7 +24,7 @@ export default function Dashboard() {
             statusFilter === 'all' ||
             invoice.status === statusFilter ||
             (statusFilter === 'approved' && invoice.status === 'pushed') ||
-            (statusFilter === 'issue' && !!invoice.issueType);
+            (statusFilter === 'issue' && invoice.issues && invoice.issues.length > 0);
 
         return matchesSearch && matchesStatus;
     });
@@ -48,7 +48,7 @@ export default function Dashboard() {
         .reduce((sum, i) => sum + i.totalAmount, 0);
 
     const issueAmount = invoices
-        .filter(i => !!i.issueType)
+        .filter(i => i.issues && i.issues.length > 0)
         .reduce((sum, i) => sum + i.totalAmount, 0);
 
     const maxAmount = Math.max(pendingAmount, approvedAmount, issueAmount, 1); // Avoid div by 0
@@ -297,7 +297,7 @@ export default function Dashboard() {
                         <div>
                             <p className="text-sm font-medium text-gray-500">Issue Tracker</p>
                             <p className="mt-2 text-3xl font-bold text-gray-900">
-                                {invoices.filter(i => !!i.issueType).length}
+                                {invoices.filter(i => i.issues && i.issues.length > 0).length}
                             </p>
                         </div>
                         <div className="rounded-full bg-red-50 p-3">
@@ -306,7 +306,7 @@ export default function Dashboard() {
                     </div>
                     <div className="mt-4 flex items-center text-sm text-red-600">
                         <span className="font-medium">
-                            {invoices.filter(i => !!i.issueType).length} items
+                            {invoices.filter(i => i.issues && i.issues.length > 0).length} items
                         </span>
                         <span className="ml-2 text-gray-400">• Needs resolution</span>
                     </div>
@@ -512,9 +512,9 @@ export default function Dashboard() {
                                                     <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-red-500"></span>Rejected
                                                 </span>
                                             )}
-                                            {invoice.issueType && (
+                                            {invoice.issues && invoice.issues.length > 0 && (
                                                 <span className="ml-2 inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800 border border-orange-200">
-                                                    {invoice.issueType}
+                                                    {invoice.issues.length} Issue{invoice.issues.length > 1 ? 's' : ''}
                                                 </span>
                                             )}
                                         </td>

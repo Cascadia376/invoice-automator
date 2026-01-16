@@ -12,6 +12,7 @@ import InvoiceReview from "./pages/InvoiceReview";
 import PDFViewOnly from "./pages/PDFViewOnly";
 import Settings from "./pages/Settings";
 import Vendors from "./pages/Vendors";
+import IssueTracker from "./pages/IssueTracker";
 import VendorDetail from "./pages/VendorDetail";
 import MonthEndReconciliation from "./pages/MonthEndReconciliation";
 import APSageView from "./pages/APSageView";
@@ -59,6 +60,7 @@ const App = () => {
                 <Route element={<RequireAuth />}>
                   <Route element={<DashboardLayout />}>
                     <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/issues" element={<IssueTracker />} />
                     <Route path="/upload" element={<Upload />} />
                     <Route path="/invoices" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/vendors" element={<Vendors />} />

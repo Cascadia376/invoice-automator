@@ -43,32 +43,45 @@ def generate_ldb_return_form(invoice: Invoice) -> bytes:
     stride = 8
     max_blocks = 5
     
-    items_with_issues = [item for item in invoice.line_items if item.issue_type]
-    
-    for i, item in enumerate(items_with_issues):
+    # NEW: Fetch from the Issue table
+    for i, issue in enumerate(invoice.issues):
         if i >= max_blocks:
             break # Template only holds 5 items per page
             
         current_sku_row = start_row + (i * stride)
         
-        # Mappings based on plan relative to SKU Row (R)
+        # We assume for LDB that an issue links to at least one line item
+        # If multiple items are linked, we'll take the first for the SKU/Description
+        item = issue.line_items[0] if issue.line_items else None
+        
         # Reason: B{R-1}
-        ws.cell(row=current_sku_row - 1, column=2, value=item.issue_type or "Generic Issue")
+        ws.cell(row=current_sku_row - 1, column=2, value=issue.type.replace('_', ' ').capitalize() if issue.type else "Generic Issue")
         
-        # SKU: B{R}
-        ws.cell(row=current_sku_row, column=2, value=item.sku or "UNKNOWN")
-        
-        # Product Name: B{R+1}
-        ws.cell(row=current_sku_row + 1, column=2, value=item.description or "")
-        
-        # Quantity: B{R+2}
-        ws.cell(row=current_sku_row + 2, column=2, value=item.quantity)
+        if item:
+            # SKU: B{R}
+            ws.cell(row=current_sku_row, column=2, value=item.sku or "UNKNOWN")
+            
+            # Product Name: B{R+1}
+            ws.cell(row=current_sku_row + 1, column=2, value=item.description or "")
+            
+            # Quantity: B{R+2}
+            ws.cell(row=current_sku_row + 2, column=2, value=item.quantity)
+        else:
+            ws.cell(row=current_sku_row, column=2, value="N/A")
+            ws.cell(row=current_sku_row + 1, column=2, value=issue.description or "")
+            ws.cell(row=current_sku_row + 2, column=2, value=1)
         
         # Invoice #: B{R+3}
         ws.cell(row=current_sku_row + 3, column=2, value=invoice.invoice_number or "")
         
         # Comments: B{R+4} (Notes)
-        notes = item.issue_notes or item.issue_description or ""
+        # Pull latest communication note if available, otherwise description
+        notes = issue.description or ""
+        if issue.communications:
+            latest_note = next((c.content for c in reversed(issue.communications) if c.type == 'note'), None)
+            if latest_note:
+                notes = latest_note
+                
         ws.cell(row=current_sku_row + 4, column=2, value=notes)
 
     output = io.BytesIO()

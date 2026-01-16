@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Table
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
@@ -31,6 +31,7 @@ class Invoice(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     line_items = relationship("LineItem", back_populates="invoice", cascade="all, delete-orphan")
+    issues = relationship("Issue", back_populates="invoice", cascade="all, delete-orphan")
 
 class LineItem(Base):
     __tablename__ = "line_items"
@@ -53,6 +54,7 @@ class LineItem(Base):
     issue_notes = Column(String, nullable=True)
 
     invoice = relationship("Invoice", back_populates="line_items")
+    issues = relationship("Issue", secondary="issue_line_items", back_populates="line_items")
 
 class GLCategory(Base):
     __tablename__ = "gl_categories"
@@ -159,3 +161,51 @@ class ProductOrder(Base):
     quantity = Column(Float)
     unit_cost = Column(Float)
     purchased_at = Column(DateTime, default=datetime.utcnow)
+
+# Association table for Issues and LineItems (M2M)
+issue_line_items = Table(
+    "issue_line_items",
+    Base.metadata,
+    Column("issue_id", String, ForeignKey("issues.id"), primary_key=True),
+    Column("line_item_id", String, ForeignKey("line_items.id"), primary_key=True)
+)
+
+class Issue(Base):
+    __tablename__ = "issues"
+
+    id = Column(String, primary_key=True, index=True)
+    organization_id = Column(String, index=True, nullable=False)
+    invoice_id = Column(String, ForeignKey("invoices.id"), nullable=False)
+    vendor_id = Column(String, ForeignKey("vendors.id"), nullable=True)
+    
+    type = Column(String) # breakage, shortship, overship, misship, price_mismatch
+    status = Column(String, default="open") # open, reported, resolved, closed
+    description = Column(String, nullable=True)
+    
+    # Resolution details
+    resolution_type = Column(String, nullable=True) # credit, replacement, refund, ignored
+    resolution_status = Column(String, default="pending") # pending, completed
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    resolved_at = Column(DateTime, nullable=True)
+
+    invoice = relationship("Invoice", back_populates="issues")
+    line_items = relationship("LineItem", secondary=issue_line_items, back_populates="issues")
+    communications = relationship("IssueCommunication", back_populates="issue", cascade="all, delete-orphan")
+
+class IssueCommunication(Base):
+    __tablename__ = "issue_communications"
+
+    id = Column(String, primary_key=True, index=True)
+    issue_id = Column(String, ForeignKey("issues.id"), nullable=False)
+    organization_id = Column(String, index=True, nullable=False)
+    
+    type = Column(String) # email, note, phone_call
+    content = Column(String)
+    recipient = Column(String, nullable=True) # email address or contact name
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    created_by = Column(String, nullable=True) # user_id
+
+    issue = relationship("Issue", back_populates="communications")

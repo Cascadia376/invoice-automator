@@ -11,10 +11,7 @@ export interface LineItem {
   amount: number;
   categoryGlCode?: string;
   confidenceScore: number;
-  issueType?: 'breakage' | 'shortship' | 'overship' | 'misship' | null;
-  issueStatus?: 'open' | 'reported' | 'resolved' | 'closed' | null;
-  issueDescription?: string | null;
-  issueNotes?: string | null;
+  issues?: Issue[];
 }
 
 export interface Invoice {
@@ -34,11 +31,43 @@ export interface Invoice {
   currency: string;
   poNumber?: string;
   status: InvoiceStatus;
-  issueType?: 'breakage' | 'shortship' | 'overship' | 'misship' | null;
   lineItems: LineItem[];
+  issues?: Issue[];
   fileUrl?: string;
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface Issue {
+  id: string;
+  organizationId: string;
+  invoiceId: string;
+  vendorId?: string;
+  type: 'breakage' | 'shortship' | 'overship' | 'misship' | 'price_mismatch';
+  status: 'open' | 'reported' | 'resolved' | 'closed';
+  description?: string;
+  resolutionType?: 'credit' | 'replacement' | 'refund' | 'ignored';
+  resolutionStatus: 'pending' | 'completed';
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt?: string;
+  lineItems?: LineItem[];
+  communications?: IssueCommunication[];
+
+  // Enriched fields
+  vendorName?: string;
+  invoiceNumber?: string;
+}
+
+export interface IssueCommunication {
+  id: string;
+  issueId: string;
+  organizationId: string;
+  type: 'email' | 'note' | 'phone_call';
+  content: string;
+  recipient?: string;
+  createdAt: string;
+  createdBy?: string;
 }
 
 export interface GLCategory {

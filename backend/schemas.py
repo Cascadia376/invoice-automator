@@ -157,3 +157,71 @@ class VendorWithStats(Vendor):
     correction_count: int = 0
     last_invoice_date: Optional[str] = None
     accuracy_rate: float = 1.0
+
+# Issue Schemas
+class IssueCommunicationBase(BaseModel):
+    type: str
+    content: str
+    recipient: Optional[str] = None
+
+class IssueCommunicationCreate(IssueCommunicationBase):
+    pass
+
+class IssueCommunication(IssueCommunicationBase):
+    id: str
+    issue_id: str
+    organization_id: str
+    created_at: datetime
+    created_by: Optional[str] = None
+
+    model_config = {
+        "from_attributes": True,
+        "populate_by_name": True,
+        "alias_generator": to_camel
+    }
+
+class IssueBase(BaseModel):
+    type: str # breakage, shortship, overship, misship, price_mismatch
+    status: str = "open"
+    description: Optional[str] = None
+    resolution_type: Optional[str] = None
+    resolution_status: str = "pending"
+
+class IssueCreate(IssueBase):
+    invoice_id: str
+    vendor_id: Optional[str] = None
+    line_item_ids: List[str] = []
+
+class IssueUpdate(BaseModel):
+    type: Optional[str] = None
+    status: Optional[str] = None
+    description: Optional[str] = None
+    resolution_type: Optional[str] = None
+    resolution_status: Optional[str] = None
+    resolved_at: Optional[datetime] = None
+
+    model_config = {
+        "populate_by_name": True,
+        "alias_generator": to_camel
+    }
+
+class Issue(IssueBase):
+    id: str
+    organization_id: str
+    invoice_id: str
+    vendor_id: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    resolved_at: Optional[datetime] = None
+    line_items: List[LineItem] = []
+    communications: List[IssueCommunication] = []
+    
+    # Nested info for dashboard
+    vendor_name: Optional[str] = None
+    invoice_number: Optional[str] = None
+
+    model_config = {
+        "from_attributes": True,
+        "populate_by_name": True,
+        "alias_generator": to_camel
+    }

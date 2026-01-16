@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 import models, database
-from routers import invoices, vendors, gl_categories, debug
+from routers import invoices, vendors, gl_categories, debug, issues
 
 models.Base.metadata.create_all(bind=database.engine)
 
@@ -37,6 +37,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app.include_router(invoices.router)
 app.include_router(vendors.router)
 app.include_router(gl_categories.router)
+app.include_router(issues.router)
 app.include_router(debug.router)
 
 @app.get("/")
