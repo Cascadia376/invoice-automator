@@ -180,6 +180,63 @@ export default function Dashboard() {
             toast.error("Bulk export failed", {
                 description: error.message,
             });
+            toast.error("Bulk export failed", {
+                description: error.message,
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleBulkExportApproved = async () => {
+        // Gets ALL approved invoices from the current filtered view
+        const approvedInvoices = filteredInvoices.filter(i => i.status === 'approved');
+
+        if (approvedInvoices.length === 0) {
+            toast.error("No approved invoices found in current view");
+            return;
+        }
+
+        const toastId = toast.loading(`Preparing export for ${approvedInvoices.length} invoices...`);
+        setIsLoading(true);
+
+        const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+
+        try {
+            const ids = approvedInvoices.map(i => i.id);
+            const token = await getToken();
+
+            const response = await fetch(`${API_BASE}/api/invoices/export/excel/bulk-approved`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify(ids)
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || "Export failed");
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `Approved_Invoices_${new Date().toISOString().split('T')[0]}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            toast.success("Export successful", { id: toastId });
+        } catch (error: any) {
+            console.error(error);
+            toast.error("Export failed", {
+                id: toastId,
+                description: error.message
+            });
         } finally {
             setIsLoading(false);
         }
@@ -208,12 +265,22 @@ export default function Dashboard() {
                             </button>
                         </div>
                     )}
+
+                    <button
+                        onClick={handleBulkExportApproved}
+                        disabled={isLoading}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-lg hover:bg-green-700 transition-colors shadow-sm disabled:opacity-50"
+                    >
+                        <FileDown className="h-4 w-4" />
+                        Download Approved (XLSX)
+                    </button>
+
                     <button
                         onClick={handleExportCSV}
                         className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
                     >
                         <FileText className="h-4 w-4" />
-                        Export CSV
+                        Export List CSV
                     </button>
                 </div>
             </div>

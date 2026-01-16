@@ -653,3 +653,58 @@ def export_invoices_bulk(
             "Access-Control-Expose-Headers": "Content-Disposition"
         }
     )
+
+@router.post("/export/excel/bulk-approved")
+def export_invoices_bulk_approved(
+    invoice_ids: List[str],
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """
+    Export specific invoices as individual XLSX files in a ZIP.
+    Strictly filters for APPROVED invoices only.
+    Items must be passed as IDs (usually from the current view).
+    """
+    # 1. Fetch Invoices from ID list
+    invoices = db.query(models.Invoice).filter(
+        models.Invoice.id.in_(invoice_ids),
+        models.Invoice.organization_id == ctx.org_id
+    ).all()
+    
+    if not invoices:
+        raise HTTPException(status_code=404, detail="No invoices found")
+        
+    # 2. Filter for APPROVED only
+    approved_invoices = [inv for inv in invoices if inv.status == 'approved']
+    
+    if not approved_invoices:
+        raise HTTPException(status_code=400, detail="None of the selected invoices are approved.")
+        
+    import zipfile
+    from datetime import datetime
+    
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+        for invoice in approved_invoices:
+            # Generate XLSX content
+            xlsx_bytes = export_service.generate_invoice_xlsx(invoice)
+            
+            # Filename: SupplierName - InvoiceNumber - Date.xlsx
+            safe_vendor = "".join(x for x in (invoice.vendor_name or "Unknown") if x.isalnum() or x in " -_").strip()
+            safe_invoice_num = "".join(x for x in (invoice.invoice_number or "NO-NUM") if x.isalnum() or x in "-_").strip()
+            safe_date = invoice.date or datetime.now().strftime("%Y-%m-%d")
+            
+            filename = f"{safe_vendor} - {safe_invoice_num} - {safe_date}.xlsx"
+            
+            zip_file.writestr(filename, xlsx_bytes)
+            
+    zip_buffer.seek(0)
+    
+    return Response(
+        content=zip_buffer.getvalue(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f"attachment; filename=\"Approved_Invoices_{datetime.now().strftime('%Y%m%d')}.zip\"",
+            "Access-Control-Expose-Headers": "Content-Disposition"
+        }
+    )

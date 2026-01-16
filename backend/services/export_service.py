@@ -80,6 +80,47 @@ def generate_ldb_report(invoice: Invoice) -> bytes:
         adjusted_width = (max_length + 2)
         ws.column_dimensions[column].width = adjusted_width
         
+
+def generate_invoice_xlsx(invoice: Invoice) -> bytes:
+    """
+    Generates a single XLSX file for the given invoice.
+    Format: SKU, Receiving Qty (UOM), Confirmed Total Cost
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Invoice Export"
+    
+    # Headers
+    headers = ["SKU", "Receiving Qty (UOM)", "Confirmed Total Cost"]
+    ws.append(headers)
+    
+    # Bold Headers
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        
+    for item in invoice.line_items:
+        ws.append([
+            item.sku or "",
+            item.quantity,
+            item.amount # Confirmed Total Cost
+        ])
+        
+    # Auto-adjust column widths
+    for col in ws.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = (max_length + 2)
+        ws.column_dimensions[column].width = adjusted_width
+        
     output = io.BytesIO()
     wb.save(output)
     return output.getvalue()
