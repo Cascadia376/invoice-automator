@@ -50,10 +50,11 @@ async def get_current_user(
         )
     token = credentials.credentials
     if not SUPABASE_JWT_SECRET:
-        print("AUTH ERROR: SUPABASE_JWT_SECRET is missing!")
+        print("CRITICAL AUTH ERROR: SUPABASE_JWT_SECRET is missing from environment!")
+        print("This will cause all authenticated requests to fail with 500.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="SUPABASE_JWT_SECRET not configured"
+            detail="Server configuration error (JWT)"
         )
 
     try:
