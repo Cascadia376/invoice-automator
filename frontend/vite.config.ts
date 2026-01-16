@@ -14,4 +14,15 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-ui': ['@radix-ui/react-popover', '@radix-ui/react-select', '@radix-ui/react-dialog', '@radix-ui/react-scroll-area'],
+          'vendor-icons': ['lucide-react'],
+        }
+      }
+    }
+  }
 }));

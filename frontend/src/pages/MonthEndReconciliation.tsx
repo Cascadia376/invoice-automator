@@ -36,7 +36,7 @@ export default function MonthEndReconciliation() {
                 const group = vendorGroups[inv.vendorName];
                 group.count++;
                 group.total += inv.totalAmount;
-                if (inv.issueType) group.issues++;
+                if (inv.issues && inv.issues.length > 0) group.issues++;
                 if (inv.status === 'approved' || inv.status === 'pushed') group.approved++;
                 group.invoices.push(inv);
             }
