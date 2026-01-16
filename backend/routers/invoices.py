@@ -589,13 +589,39 @@ def export_invoice_ldb_report(
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
+    # 1. Validation: Ensure it is an LDB invoice
+    vendor_name = (invoice.vendor_name or "").lower()
+    valid_names = ["ldb", "liquor distribution branch", "bc liquor"]
+    is_ldb = any(name in vendor_name for name in valid_names)
+    
+    if not is_ldb:
+        raise HTTPException(status_code=400, detail="LDB Issue Reports can only be generated for LDB invoices.")
+
+    # 2. Generate Report
     excel_content = ldb_service.generate_ldb_return_form(invoice)
     
+    # 3. Persist to Storage
     # Filename: LDB_Issue_Report_[Invoice#]_[Date].xlsx
     safe_invoice = "".join(x for x in (invoice.invoice_number or "Unknown") if x.isalnum() or x in "-_").strip()
     safe_date = invoice.date or datetime.now().strftime("%Y-%m-%d")
     filename = f"LDB_Issue_Report_{safe_invoice}_{safe_date}.xlsx"
     
+    # Save temp
+    temp_path = f"/tmp/{filename}"
+    with open(temp_path, "wb") as f:
+        f.write(excel_content)
+        
+    # Upload S3
+    s3_key = f"invoices/{ctx.org_id}/reports/{filename}"
+    if storage.upload_file(temp_path, s3_key):
+        # Update DB with link
+        invoice.ldb_report_url = s3_key
+        db.commit()
+    
+    # Clean up
+    if os.path.exists(temp_path):
+        os.remove(temp_path)
+
     return StreamingResponse(
         io.BytesIO(excel_content),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
