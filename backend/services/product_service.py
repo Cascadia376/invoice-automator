@@ -69,16 +69,14 @@ def get_product_by_sku(db: Session, org_id: str, sku: str) -> Optional[models.Pr
             normalized_cat = normalize_category(raw_cat)
             
             # 3. Save to local cache
-            import uuid
             new_prod = models.Product(
-                id=str(uuid.uuid4()),
                 organization_id=org_id,
                 sku=sb_prod.get("sku"),
                 name=sb_prod.get("name"),
                 category=normalized_cat,
-                units_per_case=float(sb_prod.get("units_per_case", 1.0)),
-                average_cost=float(sb_prod.get("average_cost", 0.0)),
-                last_cost=float(sb_prod.get("last_cost", 0.0)),
+                units_per_case=float(sb_prod.get("units_per_case", 1.0)) if sb_prod.get("units_per_case") is not None else 1.0,
+                average_cost=float(sb_prod.get("average_cost", 0.0)) if sb_prod.get("average_cost") is not None else 0.0,
+                last_cost=float(sb_prod.get("last_cost", 0.0)) if sb_prod.get("last_cost") is not None else 0.0,
                 min_typical_qty=float(sb_prod.get("min_typical_qty", 0.0)) if sb_prod.get("min_typical_qty") else None,
                 max_typical_qty=float(sb_prod.get("max_typical_qty", 0.0)) if sb_prod.get("max_typical_qty") else None
             )

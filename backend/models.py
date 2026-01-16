@@ -136,9 +136,8 @@ class Product(Base):
     """Master product data for validation"""
     __tablename__ = "products"
 
-    id = Column(String, primary_key=True, index=True)
+    sku = Column(String, primary_key=True, index=True)
     organization_id = Column(String, index=True, nullable=False)
-    sku = Column(String, index=True)
     name = Column(String)
     category = Column(String, nullable=True)
     units_per_case = Column(Float, default=1.0)
@@ -155,7 +154,7 @@ class ProductOrder(Base):
 
     id = Column(String, primary_key=True, index=True)
     organization_id = Column(String, index=True, nullable=False)
-    product_id = Column(String, ForeignKey("products.id"))
+    product_id = Column(String, ForeignKey("products.sku"))
     invoice_id = Column(String, ForeignKey("invoices.id"))
     quantity = Column(Float)
     unit_cost = Column(Float)
