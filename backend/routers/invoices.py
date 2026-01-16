@@ -11,7 +11,7 @@ import fitz # PyMuPDF
 
 import models, schemas, auth
 from database import get_db
-from services import parser, textract_service, vendor_service, product_service, storage, validation_service, export_service
+from services import parser, textract_service, vendor_service, product_service, storage, validation_service, export_service, ldb_service
 from services.textract_service import parse_float
 
 router = APIRouter(
@@ -589,7 +589,7 @@ def export_invoice_ldb_report(
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
-    excel_content = export_service.generate_ldb_report(invoice)
+    excel_content = ldb_service.generate_ldb_return_form(invoice)
     
     # Filename: LDB_Issue_Report_[Invoice#]_[Date].xlsx
     safe_invoice = "".join(x for x in (invoice.invoice_number or "Unknown") if x.isalnum() or x in "-_").strip()
