@@ -30,6 +30,5 @@ python -c "import openai; print('openai imported successfully')"
 
 echo "Running database migrations..."
 python migrate.py
-python migrate_line_items.py
 
 echo "Build complete!"

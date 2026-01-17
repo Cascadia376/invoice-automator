@@ -15,13 +15,13 @@ origins = [
     "http://localhost:5173",
     "https://cascadia-invoice-automator.vercel.app",
     "https://cascadia376-invoice-automator.vercel.app",
-    "https://invoice-backend-a1gb.onrender.com", # Added for easier debugging from browser
+    "https://invoice-backend-a1gb.onrender.com", 
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex="https://.*\.vercel\.app", # Allow all Vercel subdomains (previews + prod)
+    allow_origin_regex="https://.*\.vercel\.app", 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,18 +38,23 @@ async def global_exception_handler(request: Request, exc: Exception):
     print(f"GLOBAL ERROR: {exc}")
     traceback.print_exc()
     
+    # Extract origin for CORS
+    origin = request.headers.get("origin")
+    
+    response_content = {"detail": str(exc), "type": type(exc).__name__}
     response = JSONResponse(
         status_code=500,
-        content={"detail": str(exc), "type": type(exc).__name__}
+        content=response_content
     )
     
-    # Manually add CORS headers to the error response
-    origin = request.headers.get("origin")
-    if origin in origins or (origin and ".vercel.app" in origin):
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "*"
-        response.headers["Access-Control-Allow-Headers"] = "*"
+    # Manually add CORS headers to the error response if origin is valid
+    if origin:
+        is_valid_origin = origin in origins or ".vercel.app" in origin
+        if is_valid_origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "*"
+            response.headers["Access-Control-Allow-Headers"] = "*"
         
     return response
 
