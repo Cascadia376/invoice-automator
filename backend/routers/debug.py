@@ -42,6 +42,28 @@ def get_db_info():
         "database_url_masked": db_url.split("@")[-1] if "@" in db_url else "sqlite_local"
     }
 
+@router.get("/api/debug/health")
+def database_health(db: Session = Depends(get_db)):
+    """Deep health check that verifies DB query and environment"""
+    try:
+        # 1. Try a simple query
+        count = db.query(models.Invoice).count()
+        db_status = "connected"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+        count = -1
+
+    return {
+        "db_status": db_status,
+        "invoice_count": count,
+        "env": {
+            "SUPABASE_JWT_SECRET_SET": bool(os.getenv("SUPABASE_JWT_SECRET")),
+            "SUPABASE_JWT_AUD": os.getenv("SUPABASE_JWT_AUD", "authenticated"),
+            "DATABASE_URL_SET": bool(os.getenv("DATABASE_URL")),
+            "AWS_BUCKET_NAME": os.getenv("AWS_BUCKET_NAME")
+        }
+    }
+
 @router.post("/api/seed/demo")
 def seed_demo_invoice(
     db: Session = Depends(get_db),

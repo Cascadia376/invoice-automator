@@ -59,6 +59,7 @@ async def get_current_user(
 
     try:
         options = {"verify_aud": bool(SUPABASE_JWT_AUD)}
+        print(f"DEBUG: Decoding token with AUD={SUPABASE_JWT_AUD}, Secret Length={len(SUPABASE_JWT_SECRET) if SUPABASE_JWT_SECRET else 0}")
         payload = jwt.decode(
             token,
             SUPABASE_JWT_SECRET,
