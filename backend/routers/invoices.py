@@ -33,53 +33,32 @@ async def upload_invoice(
     try:
         file_id = str(uuid.uuid4())
         file_ext = os.path.splitext(file.filename)[1]
-        # Use temp file for processing
         temp_file_path = f"/tmp/{file_id}{file_ext}"
-        
-        print(f"Saving temp file to: {temp_file_path}")
         
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        print(f"File saved. Size: {os.path.getsize(temp_file_path)} bytes")
-        
-        # Upload to S3 FIRST (so Textract can access it)
+        # Upload to S3
         s3_key = f"invoices/{ctx.org_id}/{file_id}{file_ext}"
-        s3_bucket = os.getenv("AWS_BUCKET_NAME", "swift-invoice-zen-uploads")
-        print(f"Uploading to S3: {s3_key}")
         storage.upload_file(temp_file_path, s3_key)
         
         # Parse File
         if file_ext.lower() == ".xlsx":
-             print("Detected XLSX file, using LDB Parser...")
              extracted_data = ldb_parser.parse_ldb_xlsx(temp_file_path)
              extracted_data["vendor_name"] = "LDB"
         else:
-             # Parse PDF (Textract will read from S3)
-             print("Starting PDF parsing...")
+             s3_bucket = os.getenv("AWS_BUCKET_NAME", "swift-invoice-zen-uploads")
              extracted_data = parser.extract_invoice_data(temp_file_path, ctx.org_id, s3_key=s3_key, s3_bucket=s3_bucket)
-             print("PDF parsing complete.")
         
-        # Create or find vendor
         vendor_name = extracted_data.get("vendor_name", "Unknown Vendor")
         vendor = vendor_service.get_or_create_vendor(db, vendor_name, ctx.org_id)
-        print(f"Vendor: {vendor.name} (ID: {vendor.id})")
-        
-        # Apply learned corrections (e.g. bottle deposits)
         extracted_data = vendor_service.apply_vendor_corrections(db, extracted_data, vendor)
         
-        # Product Intelligence & Validation
-        all_item_flags = []
         for item in extracted_data.get("line_items", []):
             validation = product_service.validate_item_against_master(db, ctx.org_id, item)
             if validation["status"] == "success" and validation["flags"]:
-                all_item_flags.extend(validation["flags"])
-                # Supplement item data with master data if missing
                 if validation.get("master_category"):
                     item["category_gl_code"] = validation["master_category"]
-        
-        # If we have validation flags, we could store them in notes or a specific field.
-        # For now, let's prefix the status or add a note if we had one.
         
         # Create DB Entry
         db_invoice = models.Invoice(
@@ -102,10 +81,7 @@ async def upload_invoice(
             vendor_id=vendor.id
         )
 
-        # Save Line Items
         line_items_data = extracted_data.get("line_items", [])
-        print(f"DATABASE: Saving {len(line_items_data)} line items for invoice {file_id}")
-        
         for item in line_items_data:
             sku = item.get("sku")
             category_gl_code = item.get("category_gl_code")
@@ -141,10 +117,8 @@ async def upload_invoice(
         db.commit()
         db.refresh(db_invoice)
         
-        print(f"SUCCESS: Invoice {file_id} saved with {len(db_invoice.line_items)} line items")
-
-        if db_invoice.file_url and not db_invoice.file_url.startswith("http"):
-             db_invoice.file_url = storage.get_presigned_url(db_invoice.file_url)
+        # Point to proxy endpoint
+        db_invoice.file_url = f"/api/invoices/{db_invoice.id}/file"
              
         return db_invoice
     except Exception as e:
@@ -163,13 +137,48 @@ def read_invoices(
     print(f"FETCH REQUEST: User={ctx.user_id}, Org={ctx.org_id}")
     invoices = db.query(models.Invoice).filter(models.Invoice.organization_id == ctx.org_id).offset(skip).limit(limit).all()
     
-    # Generate presigned URLs
+    # Point to proxy endpoint
     for inv in invoices:
-        if inv.file_url and not inv.file_url.startswith("http"):
-             # Assume it's an S3 key
-             inv.file_url = storage.get_presigned_url(inv.file_url)
+        if inv.file_url:
+             inv.file_url = f"/api/invoices/{inv.id}/file"
              
     return invoices
+
+@router.get("/{invoice_id}/file")
+def get_invoice_file(
+    invoice_id: str,
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """Proxy endpoint to stream files from S3 and avoid CORS issues"""
+    invoice = db.query(models.Invoice).filter(
+        models.Invoice.id == invoice_id,
+        models.Invoice.organization_id == ctx.org_id
+    ).first()
+    
+    if not invoice or not invoice.file_url:
+        raise HTTPException(status_code=404, detail="File not found")
+        
+    s3_key = invoice.file_url
+    if s3_key.startswith("/api/"): # Re-entrant check
+        # We need the original key. If we only stored the proxy path in DB (which we shouldn't)
+        # we'd be stuck. But we store s3_key in DB and only overwrite in response.
+        pass
+
+    import boto3
+    s3 = storage.get_s3_client()
+    try:
+        response = s3.get_object(Bucket=storage.AWS_BUCKET_NAME, Key=s3_key)
+        return StreamingResponse(
+            response['Body'], 
+            media_type=response.get('ContentType', 'application/pdf'),
+            headers={
+                "Content-Disposition": f"inline; filename=\"{invoice_id}.pdf\""
+            }
+        )
+    except Exception as e:
+        print(f"PROXY ERROR: {e}")
+        raise HTTPException(status_code=404, detail="File not found in storage")
 
 from sqlalchemy.orm import joinedload
 
@@ -186,13 +195,11 @@ def read_invoice(
     ).first()
     
     if invoice is None:
-        print(f"READ ERROR: Invoice {invoice_id} not found")
         raise HTTPException(status_code=404, detail="Invoice not found")
     
-    print(f"READ SUCCESS: Found invoice {invoice_id}. Line Items Count: {len(invoice.line_items)}")
-    
-    if invoice.file_url and not invoice.file_url.startswith("http"):
-         invoice.file_url = storage.get_presigned_url(invoice.file_url)
+    # Point to proxy endpoint
+    if invoice.file_url:
+         invoice.file_url = f"/api/invoices/{invoice.id}/file"
 
     # Calculate Category Summary
     summary = {}
@@ -200,7 +207,6 @@ def read_invoice(
         cat = item.category_gl_code or "Uncategorized"
         summary[cat] = summary.get(cat, 0.0) + (item.amount or 0.0)
     
-    # Round totals
     invoice.category_summary = {k: round(v, 2) for k, v in summary.items()}
          
     return invoice
@@ -264,8 +270,8 @@ def update_invoice(
     db.commit()
     db.refresh(db_invoice)
     
-    if db_invoice.file_url and not db_invoice.file_url.startswith("http"):
-         db_invoice.file_url = storage.get_presigned_url(db_invoice.file_url)
+    if db_invoice.file_url:
+         db_invoice.file_url = f"/api/invoices/{db_invoice.id}/file"
          
     return db_invoice
 
