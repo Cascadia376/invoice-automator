@@ -17,4 +17,8 @@ services:
         sync: false
       - key: AWS_BUCKET_NAME
         sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false # Must be set to allow authenticated requests
+      - key: SUPABASE_JWT_AUD
+        value: authenticated
     autoDeploy: true
