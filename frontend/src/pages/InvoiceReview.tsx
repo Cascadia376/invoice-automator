@@ -13,6 +13,7 @@ import {
   CircleHelp,
   FileText,
   FileDown,
+  CheckCircle2,
 } from "lucide-react";
 import {
   ResizableHandle,
@@ -211,6 +212,27 @@ export default function InvoiceReview() {
       navigate("/dashboard");
     }
   };
+
+  const handlePostToPos = async () => {
+    if (!invoice) return;
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE}/api/invoices/${invoice.id}/post`, {
+        method: 'PATCH',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+
+      if (!response.ok) throw new Error("Failed to post to POS");
+
+      const updatedInvoice = await response.json();
+      setInvoice(updatedInvoice);
+      toast.success("Invoice marked as Posted in POS");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to mark as posted");
+    }
+  };
+
   const handleExportExcel = async () => {
     if (!invoice) return;
     try {
@@ -505,6 +527,24 @@ export default function InvoiceReview() {
                     <span className="material-symbols-outlined text-base -ml-1 mr-2">check</span>
                     <span>Approve</span>
                   </button>
+
+                  {invoice.status === 'approved' && !invoice.isPosted && (
+                    <button
+                      onClick={handlePostToPos}
+                      className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      type="button"
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      <span>Post to POS</span>
+                    </button>
+                  )}
+
+                  {invoice.isPosted && (
+                    <div className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-blue-700 bg-blue-50 rounded-lg border border-blue-200">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Posted in POS
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -7,11 +7,15 @@ interface InvoiceContextType {
     invoices: Invoice[];
     stats: DashboardStats;
     glCategories: GLCategory[];
+    totalCount: number;
+    currentPage: number;
+    pageSize: number;
+    setPage: (page: number) => void;
     getInvoice: (id: string) => Invoice | undefined;
     updateInvoice: (id: string, data: Partial<Invoice>) => Promise<void>;
     uploadInvoice: (file: File) => Promise<void>;
     deleteInvoice: (id: string) => void;
-    refreshInvoices: () => Promise<void>;
+    refreshInvoices: (skip?: number, limit?: number, search?: string, status?: string) => Promise<void>;
     fetchGLCategories: () => Promise<void>;
     createGLCategory: (category: Omit<GLCategory, 'id'>) => Promise<void>;
     updateGLCategory: (id: string, category: Omit<GLCategory, 'id'>) => Promise<void>;
@@ -37,17 +41,30 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         pushed: 0,
         timeSaved: '0h'
     });
+    const [totalCount, setTotalCount] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(25);
+    const [lastFilters, setLastFilters] = useState({ search: "", status: "all" });
 
-    const refreshInvoices = useCallback(async () => {
+    const refreshInvoices = useCallback(async (skip = 0, limit = 25, search = "", status = "all") => {
         setIsLoading(true);
-        console.log(`DEBUG: Refreshing invoices from ${API_URL}/invoices`);
+        setLastFilters({ search, status });
+        const queryParams = new URLSearchParams({
+            skip: skip.toString(),
+            limit: limit.toString(),
+        });
+        if (search) queryParams.append('search', search);
+        if (status && status !== 'all') queryParams.append('status', status);
+
+        const url = `${API_URL}/invoices?${queryParams.toString()}`;
+        console.log(`DEBUG: Refreshing invoices from ${url}`);
         try {
             const token = await getToken();
             if (!token && !disableAuth) {
                 setIsLoading(false);
                 return;
             }
-            const response = await fetch(`${API_URL}/invoices`, {
+            const response = await fetch(url, {
                 headers: {
                     ...(token ? { Authorization: `Bearer ${token}` } : {})
                 }
@@ -55,19 +72,24 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             if (response.ok) {
                 const data = await response.json();
                 console.log("DEBUG: Fetched invoices:", data);
-                setInvoices(data);
+                setInvoices(data.items);
+                setTotalCount(data.total);
+                setPageSize(data.limit);
+                setCurrentPage(Math.floor(data.skip / data.limit) + 1);
             } else {
-                console.error(`DEBUG: Failed to fetch invoices from ${API_URL}/invoices. Status: ${response.status} ${response.statusText}`);
-                if (response.status === 403 || response.status === 401) {
-                    console.error("DEBUG: Possible CORS or Auth issue.");
-                }
+                console.error(`DEBUG: Failed to fetch invoices. Status: ${response.status}`);
             }
         } catch (error) {
-            console.error(`DEBUG: Network or Fetch error for ${API_URL}/invoices:`, error);
+            console.error(`DEBUG: Network or Fetch error:`, error);
         } finally {
             setIsLoading(false);
         }
     }, [getToken, disableAuth]);
+
+    const setPage = useCallback((page: number) => {
+        const skip = (page - 1) * pageSize;
+        refreshInvoices(skip, pageSize, lastFilters.search, lastFilters.status);
+    }, [pageSize, refreshInvoices, lastFilters]);
 
     const fetchGLCategories = useCallback(async () => {
         try {
@@ -103,19 +125,19 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     // Calculate stats whenever invoices change
     useEffect(() => {
+        // Stats are a bit tricky with pagination if we only have current page's invoices
+        // Ideally the backend returns global stats. For now we use the totalCount for total.
         const needsReview = invoices.filter(i => i.status === 'needs_review').length;
         const approved = invoices.filter(i => i.status === 'approved' || i.status === 'pushed').length;
-        const total = invoices.length;
-        // Mock calculation: 15 mins saved per pushed invoice
-        const hoursSaved = ((approved * 15) / 60).toFixed(1);
 
-        setStats({
-            totalInvoices: total,
-            needsReview,
+        setStats(prev => ({
+            ...prev,
+            totalInvoices: totalCount,
+            needsReview: prev.needsReview, // These should ideally come from backend stats
             pushed: approved,
-            timeSaved: `${hoursSaved}h`
-        });
-    }, [invoices]);
+            timeSaved: `${((approved * 15) / 60).toFixed(1)}h`
+        }));
+    }, [invoices, totalCount]);
 
     const getInvoice = useCallback((id: string) => invoices.find(i => i.id === id), [invoices]);
 
@@ -181,10 +203,11 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             });
 
             if (response.ok) {
-                const newInvoice = await response.json();
-                console.log("DEBUG: Upload success. New Invoice:", newInvoice);
-                setInvoices(prev => [newInvoice, ...prev]);
-                toast.success("Invoice uploaded and parsed!");
+                const newInvoices: Invoice[] = await response.json();
+                console.log("DEBUG: Upload success. New Invoices:", newInvoices);
+                setInvoices(prev => [...newInvoices, ...prev]);
+                setTotalCount(prev => prev + newInvoices.length);
+                toast.success(`Uploaded and processed ${newInvoices.length} invoice(s)!`);
             } else {
                 console.error("DEBUG: Upload failed. Status:", response.status);
                 toast.error("Upload failed");
@@ -205,6 +228,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
             if (response.ok) {
                 setInvoices(prev => prev.filter(i => i.id !== id));
+                setTotalCount(prev => prev - 1);
                 toast.success("Invoice deleted");
             } else {
                 toast.error("Failed to delete invoice");
@@ -297,6 +321,10 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             invoices,
             stats,
             glCategories,
+            totalCount,
+            currentPage,
+            pageSize,
+            setPage,
             getInvoice,
             updateInvoice,
             uploadInvoice,

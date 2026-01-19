@@ -1,4 +1,4 @@
-import { Home, Upload, Settings, AlertCircle } from "lucide-react";
+import { Home, Upload, Settings, AlertCircle, TrendingUp } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -9,6 +9,7 @@ export function AppHeader() {
     const navItems = [
         { icon: Home, label: "Dashboard", href: "/dashboard" },
         { icon: AlertCircle, label: "Issue Tracker", href: "/issues" },
+        { icon: TrendingUp, label: "AP View", href: "/ap-pos-view" },
         { icon: Upload, label: "Upload", href: "/upload" },
         { icon: Settings, label: "Settings", href: "/settings" },
     ];

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Table
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Table, Boolean
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
@@ -28,6 +28,7 @@ class Invoice(Base):
     raw_extraction_results = Column(String, nullable=True) # JSON string of raw Textract/LLM output
     ldb_report_url = Column(String, nullable=True) # URL/Key to the last generated LDB report
     vendor_id = Column(String, ForeignKey("vendors.id"), nullable=True)
+    is_posted = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     line_items = relationship("LineItem", back_populates="invoice", cascade="all, delete-orphan")

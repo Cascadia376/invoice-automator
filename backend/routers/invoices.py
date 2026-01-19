@@ -11,7 +11,7 @@ import fitz # PyMuPDF
 
 import models, schemas, auth
 from database import get_db
-from services import parser, textract_service, vendor_service, product_service, storage, validation_service, export_service, ldb_service, ldb_parser
+from services import parser, textract_service, vendor_service, product_service, storage, validation_service, export_service, ldb_service, ldb_parser, splitting_service
 from services.textract_service import parse_float
 
 router = APIRouter(
@@ -23,126 +23,184 @@ router = APIRouter(
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 
-@router.post("/upload", response_model=schemas.Invoice)
+@router.post("/upload", response_model=List[schemas.Invoice])
 async def upload_invoice(
     file: UploadFile = File(...), 
     db: Session = Depends(get_db),
     ctx: auth.UserContext = Depends(auth.get_current_user)
 ):
-    print(f"UPLOAD REQUEST: User={ctx.user_id}, Org={ctx.org_id}")
+    print(f"UPLOAD REQUEST: User={ctx.user_id}, Org={ctx.org_id}, File={file.filename}")
     try:
         file_id = str(uuid.uuid4())
-        file_ext = os.path.splitext(file.filename)[1]
-        temp_file_path = f"/tmp/{file_id}{file_ext}"
+        file_ext = os.path.splitext(file.filename)[1].lower()
+        original_temp_path = f"/tmp/original_{file_id}{file_ext}"
         
-        with open(temp_file_path, "wb") as buffer:
+        with open(original_temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        # Upload to S3
-        s3_key = f"invoices/{ctx.org_id}/{file_id}{file_ext}"
-        storage.upload_file(temp_file_path, s3_key)
-        
-        # Parse File
-        if file_ext.lower() == ".xlsx":
-             extracted_data = ldb_parser.parse_ldb_xlsx(temp_file_path)
-             extracted_data["vendor_name"] = "LDB"
+        # 1. Decide if splitting is needed (only for PDFs)
+        files_to_process = []
+        if file_ext == ".pdf":
+            print(f"DEBUG: Checking for multi-invoice content in {file.filename}")
+            boundaries = splitting_service.detect_invoice_boundaries(original_temp_path)
+            
+            if len(boundaries) > 1:
+                print(f"DEBUG: Multiple invoices detected ({len(boundaries)}). Splitting...")
+                split_paths = splitting_service.split_pdf_into_files(original_temp_path, boundaries)
+                files_to_process = split_paths
+            else:
+                files_to_process = [original_temp_path]
         else:
-             s3_bucket = os.getenv("AWS_BUCKET_NAME", "swift-invoice-zen-uploads")
-             extracted_data = parser.extract_invoice_data(temp_file_path, ctx.org_id, s3_key=s3_key, s3_bucket=s3_bucket)
-        
-        vendor_name = extracted_data.get("vendor_name", "Unknown Vendor")
-        vendor = vendor_service.get_or_create_vendor(db, vendor_name, ctx.org_id)
-        extracted_data = vendor_service.apply_vendor_corrections(db, extracted_data, vendor)
-        
-        for item in extracted_data.get("line_items", []):
-            validation = product_service.validate_item_against_master(db, ctx.org_id, item)
-            if validation["status"] == "success" and validation["flags"]:
-                if validation.get("master_category"):
-                    item["category_gl_code"] = validation["master_category"]
-        
-        # Create DB Entry
-        db_invoice = models.Invoice(
-            id=file_id,
-            organization_id=ctx.org_id,
-            invoice_number=extracted_data.get("invoice_number", "UNKNOWN"),
-            vendor_name=extracted_data.get("vendor_name", "Unknown Vendor"),
-            date=extracted_data.get("date"),
-            total_amount=extracted_data.get("total_amount", 0.0),
-            subtotal=extracted_data.get("subtotal", 0.0),
-            shipping_amount=extracted_data.get("shipping_amount", 0.0),
-            discount_amount=extracted_data.get("discount_amount", 0.0),
-            tax_amount=extracted_data.get("tax_amount", 0.0),
-            deposit_amount=extracted_data.get("deposit_amount", 0.0),
-            currency=extracted_data.get("currency", "CAD"),
-            po_number=extracted_data.get("po_number"),
-            status="needs_review",
-            file_url=s3_key,
-            raw_extraction_results=extracted_data.get("raw_extraction_results"),
-            vendor_id=vendor.id
-        )
+            files_to_process = [original_temp_path]
 
-        line_items_data = extracted_data.get("line_items", [])
-        for item in line_items_data:
-            sku = item.get("sku")
-            category_gl_code = item.get("category_gl_code")
+        created_invoices = []
+
+        # 2. Process each file
+        for current_file_path in files_to_process:
+            current_file_id = str(uuid.uuid4())
+            current_ext = os.path.splitext(current_file_path)[1]
             
-            if sku and not category_gl_code:
-                try:
-                    mapping = db.query(models.SKUCategoryMapping).filter(
-                        models.SKUCategoryMapping.sku == sku,
-                        models.SKUCategoryMapping.organization_id == ctx.org_id
-                    ).order_by(models.SKUCategoryMapping.usage_count.desc()).first()
-                    if mapping:
-                        category_gl_code = mapping.category_gl_code
-                except Exception as e:
-                    print(f"WARNING: SKU mapping lookup error: {e}")
+            # Upload to S3
+            s3_key = f"invoices/{ctx.org_id}/{current_file_id}{current_ext}"
+            storage.upload_file(current_file_path, s3_key)
             
-            db_item = models.LineItem(
-                id=str(uuid.uuid4()), 
-                invoice_id=file_id, 
-                sku=sku,
-                description=item.get("description", "Item"),
-                units_per_case=parse_float(item.get("units_per_case", 1.0)),
-                cases=parse_float(item.get("cases", 0.0)),
-                quantity=parse_float(item.get("quantity", 1.0)),
-                case_cost=parse_float(item.get("case_cost")) if item.get("case_cost") is not None else None,
-                unit_cost=parse_float(item.get("unit_cost", 0.0)),
-                amount=parse_float(item.get("amount", 0.0)),
-                category_gl_code=category_gl_code,
-                confidence_score=parse_float(item.get("confidence_score", 1.0))
+            # Parse File
+            if current_ext.lower() == ".xlsx":
+                 extracted_data = ldb_parser.parse_ldb_xlsx(current_file_path)
+                 extracted_data["vendor_name"] = "LDB"
+            else:
+                 s3_bucket = os.getenv("AWS_BUCKET_NAME", "swift-invoice-zen-uploads")
+                 extracted_data = parser.extract_invoice_data(current_file_path, ctx.org_id, s3_key=s3_key, s3_bucket=s3_bucket)
+            
+            vendor_name = extracted_data.get("vendor_name", "Unknown Vendor")
+            vendor = vendor_service.get_or_create_vendor(db, vendor_name, ctx.org_id)
+            extracted_data = vendor_service.apply_vendor_corrections(db, extracted_data, vendor)
+            
+            for item in extracted_data.get("line_items", []):
+                validation = product_service.validate_item_against_master(db, ctx.org_id, item)
+                if validation["status"] == "success" and validation["flags"]:
+                    if validation.get("master_category"):
+                        item["category_gl_code"] = validation["master_category"]
+            
+            # Create DB Entry
+            db_invoice = models.Invoice(
+                id=current_file_id,
+                organization_id=ctx.org_id,
+                invoice_number=extracted_data.get("invoice_number", "UNKNOWN"),
+                vendor_name=extracted_data.get("vendor_name", "Unknown Vendor"),
+                date=extracted_data.get("date"),
+                total_amount=extracted_data.get("total_amount", 0.0),
+                subtotal=extracted_data.get("subtotal", 0.0),
+                shipping_amount=extracted_data.get("shipping_amount", 0.0),
+                discount_amount=extracted_data.get("discount_amount", 0.0),
+                tax_amount=extracted_data.get("tax_amount", 0.0),
+                deposit_amount=extracted_data.get("deposit_amount", 0.0),
+                currency=extracted_data.get("currency", "CAD"),
+                po_number=extracted_data.get("po_number"),
+                status="needs_review",
+                file_url=s3_key,
+                raw_extraction_results=extracted_data.get("raw_extraction_results"),
+                vendor_id=vendor.id
             )
-            db_invoice.line_items.append(db_item)
-        
-        db.add(db_invoice)
-        db.commit()
-        db.refresh(db_invoice)
-        
-        # Point to proxy endpoint
-        db_invoice.file_url = f"/api/invoices/{db_invoice.id}/file"
+
+            line_items_data = extracted_data.get("line_items", [])
+            for item in line_items_data:
+                sku = item.get("sku")
+                category_gl_code = item.get("category_gl_code")
+                
+                if sku and not category_gl_code:
+                    try:
+                        mapping = db.query(models.SKUCategoryMapping).filter(
+                            models.SKUCategoryMapping.sku == sku,
+                            models.SKUCategoryMapping.organization_id == ctx.org_id
+                        ).order_by(models.SKUCategoryMapping.usage_count.desc()).first()
+                        if mapping:
+                            category_gl_code = mapping.category_gl_code
+                    except Exception as e:
+                        print(f"WARNING: SKU mapping lookup error: {e}")
+                
+                db_item = models.LineItem(
+                    id=str(uuid.uuid4()), 
+                    invoice_id=current_file_id, 
+                    sku=sku,
+                    description=item.get("description", "Item"),
+                    units_per_case=textract_service.parse_float(item.get("units_per_case", 1.0)),
+                    cases=textract_service.parse_float(item.get("cases", 0.0)),
+                    quantity=textract_service.parse_float(item.get("quantity", 1.0)),
+                    case_cost=textract_service.parse_float(item.get("case_cost")) if item.get("case_cost") is not None else None,
+                    unit_cost=textract_service.parse_float(item.get("unit_cost", 0.0)),
+                    amount=textract_service.parse_float(item.get("amount", 0.0)),
+                    category_gl_code=category_gl_code,
+                    confidence_score=textract_service.parse_float(item.get("confidence_score", 1.0))
+                )
+                db_invoice.line_items.append(db_item)
+            
+            db.add(db_invoice)
+            db.commit()
+            db.refresh(db_invoice)
+            
+            # Point to proxy endpoint
+            db_invoice.file_url = f"/api/invoices/{db_invoice.id}/file"
+            created_invoices.append(db_invoice)
              
-        return db_invoice
+        # Cleanup temp files if they are splits
+        if len(files_to_process) > 1:
+            for p in files_to_process:
+                if os.path.exists(p) and "/tmp/splits" in p:
+                    os.remove(p)
+        if os.path.exists(original_temp_path):
+            os.remove(original_temp_path)
+
+        return created_invoices
     except Exception as e:
         print(f"ERROR processing invoice: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("", response_model=List[schemas.Invoice])
+from sqlalchemy import or_
+
+@router.get("", response_model=schemas.InvoiceListResponse)
 def read_invoices(
     skip: int = 0, 
     limit: int = 100, 
+    search: Optional[str] = None,
+    status: Optional[str] = None,
     db: Session = Depends(get_db),
     ctx: auth.UserContext = Depends(auth.get_current_user)
 ):
-    print(f"FETCH REQUEST: User={ctx.user_id}, Org={ctx.org_id}")
-    invoices = db.query(models.Invoice).filter(models.Invoice.organization_id == ctx.org_id).offset(skip).limit(limit).all()
+    print(f"FETCH REQUEST: User={ctx.user_id}, Org={ctx.org_id}, Skip={skip}, Limit={limit}, Search={search}, Status={status}")
+    query = db.query(models.Invoice).filter(models.Invoice.organization_id == ctx.org_id)
+    
+    if search:
+        query = query.filter(
+            or_(
+                models.Invoice.invoice_number.ilike(f"%{search}%"),
+                models.Invoice.vendor_name.ilike(f"%{search}%")
+            )
+        )
+    
+    if status and status != 'all':
+        # Handle custom 'issue' status which might be defined as invoices with issues
+        if status == 'issue':
+            query = query.filter(models.Invoice.line_items.any(models.LineItem.issue_type.isnot(None)))
+        else:
+            query = query.filter(models.Invoice.status == status)
+            
+    total = query.count()
+    invoices = query.order_by(models.Invoice.created_at.desc()).offset(skip).limit(limit).all()
     
     # Point to proxy endpoint
     for inv in invoices:
         if inv.file_url:
              inv.file_url = f"/api/invoices/{inv.id}/file"
              
-    return invoices
+    return {
+        "items": invoices,
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 @router.get("/{invoice_id}/file")
 def get_invoice_file(
@@ -291,6 +349,68 @@ def delete_invoice(
     db.delete(db_invoice)
     db.commit()
     return {"status": "success", "message": "Invoice deleted"}
+
+@router.patch("/{invoice_id}/post", response_model=schemas.Invoice)
+def post_invoice_to_pos(
+    invoice_id: str,
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    db_invoice = db.query(models.Invoice).filter(
+        models.Invoice.id == invoice_id,
+        models.Invoice.organization_id == ctx.org_id
+    ).first()
+    if db_invoice is None:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    db_invoice.is_posted = True
+    db.commit()
+    db.refresh(db_invoice)
+    
+    if db_invoice.file_url:
+         db_invoice.file_url = f"/api/invoices/{db_invoice.id}/file"
+         
+    return db_invoice
+
+@router.get("/stats/category-summary")
+def get_category_summary(
+    month: Optional[str] = None, # YYYY-MM
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    query = db.query(models.Invoice).filter(
+        models.Invoice.organization_id == ctx.org_id,
+        models.Invoice.status == 'approved',
+        models.Invoice.is_posted == True
+    )
+    
+    if month:
+        # Simple string-based filter for date (assuming YYYY-MM-DD format in DB)
+        query = query.filter(models.Invoice.date.like(f"{month}%"))
+        
+    invoices = query.all()
+    
+    summary = {}
+    total_tax = 0.0
+    total_deposit = 0.0
+    total_amount = 0.0
+    
+    for inv in invoices:
+        total_tax += (inv.tax_amount or 0.0)
+        total_deposit += (inv.deposit_amount or 0.0)
+        total_amount += (inv.total_amount or 0.0)
+        
+        for item in inv.line_items:
+            cat = item.category_gl_code or "Uncategorized"
+            summary[cat] = summary.get(cat, 0.0) + (item.amount or 0.0)
+            
+    return {
+        "category_totals": {k: round(v, 2) for k, v in summary.items()},
+        "total_tax": round(total_tax, 2),
+        "total_deposit": round(total_deposit, 2),
+        "total_amount": round(total_amount, 2),
+        "invoice_count": len(invoices)
+    }
 
 @router.post("/{invoice_id}/feedback")
 def submit_feedback(

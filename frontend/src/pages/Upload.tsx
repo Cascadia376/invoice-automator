@@ -49,15 +49,15 @@ export default function Upload() {
     const processFiles = async (files: File[]) => {
         setIsUploading(true);
         try {
-            // Process one by one for MVP
+            // New logic: individual files being uploaded
             for (const file of files) {
                 await uploadInvoice(file);
             }
-            toast.success(`Successfully uploaded ${files.length} invoice(s)`);
+            // Success is handled by InvoiceContext and navigate
             navigate('/dashboard');
         } catch (error) {
             console.error(error);
-            toast.error('Failed to upload invoices');
+            // Error toast also in InvoiceContext, but good to have a catch-all
         } finally {
             setIsUploading(false);
         }

@@ -14,8 +14,8 @@ import Settings from "./pages/Settings";
 import Vendors from "./pages/Vendors";
 import IssueTracker from "./pages/IssueTracker";
 import VendorDetail from "./pages/VendorDetail";
-import MonthEndReconciliation from "./pages/MonthEndReconciliation";
 import APSageView from "./pages/APSageView";
+import APPosView from "./pages/APPosView";
 import NotFound from "./pages/NotFound";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 
@@ -64,8 +64,8 @@ const App = () => {
                     <Route path="/upload" element={<Upload />} />
                     <Route path="/invoices" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/vendors" element={<Vendors />} />
-                    <Route path="/reconcile" element={<MonthEndReconciliation />} />
                     <Route path="/ap-view" element={<APSageView />} />
+                    <Route path="/ap-pos-view" element={<APPosView />} />
                     <Route path="/settings" element={<Settings />} />
                   </Route>
                   <Route path="/invoices/:id" element={<InvoiceReview />} />

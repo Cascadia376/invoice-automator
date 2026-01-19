@@ -30,6 +30,7 @@ export interface Invoice {
   depositAmount?: number;
   currency: string;
   poNumber?: string;
+  isPosted: boolean;
   status: InvoiceStatus;
   lineItems: LineItem[];
   issues?: Issue[];

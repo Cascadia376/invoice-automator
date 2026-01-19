@@ -57,6 +57,7 @@ class InvoiceBase(BaseModel):
     status: str
     file_url: Optional[str] = None
     issue_type: Optional[str] = None
+    is_posted: bool = False
 
     @validator('invoice_number', 'vendor_name', pre=True, check_fields=False)
     def ensure_string(cls, v):
@@ -87,11 +88,23 @@ class InvoiceUpdate(BaseModel):
     status: Optional[str] = None
     deposit_amount: Optional[float] = None
     issue_type: Optional[str] = None
+    is_posted: Optional[bool] = None
     line_items: Optional[List[LineItemBase]] = None
 
     class Config:
         alias_generator = to_camel
         populate_by_name = True
+
+class InvoiceListResponse(BaseModel):
+    items: List[Invoice]
+    total: int
+    skip: int
+    limit: int
+
+    model_config = {
+        "populate_by_name": True,
+        "alias_generator": to_camel
+    }
 
 class Invoice(InvoiceBase):
     id: str

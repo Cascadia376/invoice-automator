@@ -7,27 +7,26 @@ import { Search, Plus, Inbox, Beaker, MoreVertical, AlertCircle, Clock, FileText
 import { formatCurrency } from "@/lib/utils";
 
 export default function Dashboard() {
-    const { invoices, stats, deleteInvoice, updateInvoice } = useInvoice();
+    const {
+        invoices, refreshInvoices, totalCount, currentPage, pageSize, setPage, deleteInvoice, updateInvoice
+    } = useInvoice();
     const { getToken } = useAuth();
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState<'all' | 'needs_review' | 'approved' | 'failed' | 'issue'>('all');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    const [isLoading, setIsLoading] = useState(false);
+    // Remove local isLoading, use context's isLoading if needed or just context refresh
 
-    const filteredInvoices = invoices.filter(invoice => {
-        const matchesSearch =
-            invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            invoice.vendorName.toLowerCase().includes(searchTerm.toLowerCase());
+    // Debounced search effect
+    React.useEffect(() => {
+        const timer = setTimeout(() => {
+            refreshInvoices(0, pageSize, searchTerm, statusFilter);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm, statusFilter, refreshInvoices, pageSize]);
 
-        const matchesStatus =
-            statusFilter === 'all' ||
-            invoice.status === statusFilter ||
-            (statusFilter === 'approved' && invoice.status === 'pushed') ||
-            (statusFilter === 'issue' && invoice.issues && invoice.issues.length > 0);
-
-        return matchesSearch && matchesStatus;
-    });
+    // Use current invoices directly as they are already filtered by the server
+    const filteredInvoices = invoices;
 
     // Calculate dynamic stats from actual invoices
     const totalOverdue = invoices
@@ -529,6 +528,53 @@ export default function Dashboard() {
                             )}
                         </tbody>
                     </table>
+                </div>
+
+                {/* Pagination Controls */}
+                <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
+                    <div className="flex flex-1 justify-between sm:hidden">
+                        <button
+                            onClick={() => setPage(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            className={`relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                            Previous
+                        </button>
+                        <button
+                            onClick={() => setPage(currentPage + 1)}
+                            disabled={currentPage * pageSize >= totalCount}
+                            className={`relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 ${currentPage * pageSize >= totalCount ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                            Next
+                        </button>
+                    </div>
+                    <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                        <div>
+                            <p className="text-sm text-gray-700">
+                                Showing <span className="font-medium">{totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> to <span className="font-medium">{Math.min(currentPage * pageSize, totalCount)}</span> of{' '}
+                                <span className="font-medium">{totalCount}</span> results
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-500">Page {currentPage} of {Math.ceil(totalCount / pageSize) || 1}</span>
+                            <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                                <button
+                                    onClick={() => setPage(currentPage - 1)}
+                                    disabled={currentPage === 1}
+                                    className={`relative inline-flex items-center rounded-l-md px-3 py-2 text-gray-600 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    Previous
+                                </button>
+                                <button
+                                    onClick={() => setPage(currentPage + 1)}
+                                    disabled={currentPage * pageSize >= totalCount}
+                                    className={`relative inline-flex items-center rounded-r-md px-3 py-2 text-gray-600 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 ${currentPage * pageSize >= totalCount ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    Next
+                                </button>
+                            </nav>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
