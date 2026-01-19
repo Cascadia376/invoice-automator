@@ -72,10 +72,19 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             if (response.ok) {
                 const data = await response.json();
                 console.log("DEBUG: Fetched invoices:", data);
-                setInvoices(data.items);
-                setTotalCount(data.total);
-                setPageSize(data.limit);
-                setCurrentPage(Math.floor(data.skip / data.limit) + 1);
+
+                if (Array.isArray(data)) {
+                    // Backwards compatibility for old array response
+                    setInvoices(data);
+                    setTotalCount(data.length);
+                    setCurrentPage(1);
+                } else {
+                    // New paginated object response
+                    setInvoices(data.items || []);
+                    setTotalCount(data.total || 0);
+                    setPageSize(data.limit || 25);
+                    setCurrentPage(Math.floor((data.skip || 0) / (data.limit || 25)) + 1);
+                }
             } else {
                 console.error(`DEBUG: Failed to fetch invoices. Status: ${response.status}`);
             }
