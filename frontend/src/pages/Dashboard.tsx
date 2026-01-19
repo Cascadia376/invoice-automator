@@ -1,24 +1,24 @@
 import { useInvoice } from "@/context/InvoiceContext";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Search, Plus, Inbox, Beaker, MoreVertical, AlertCircle, Clock, FileText, FileDown, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 export default function Dashboard() {
     const {
-        invoices, refreshInvoices, totalCount, currentPage, pageSize, setPage, deleteInvoice, updateInvoice
+        invoices, refreshInvoices, totalCount, currentPage, pageSize, setPage, deleteInvoice, updateInvoice, stats
     } = useInvoice();
     const { getToken } = useAuth();
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState<'all' | 'needs_review' | 'approved' | 'failed' | 'issue'>('all');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    // Remove local isLoading, use context's isLoading if needed or just context refresh
+    const [isLoading, setIsLoading] = useState(false);
 
     // Debounced search effect
-    React.useEffect(() => {
+    useEffect(() => {
         const timer = setTimeout(() => {
             refreshInvoices(0, pageSize, searchTerm, statusFilter);
         }, 300);

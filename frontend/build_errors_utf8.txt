@@ -1,0 +1,11 @@
+﻿
+> vite_react_shadcn_ts@0.0.0 build
+> tsc -b && vite build
+
+src/pages/Dashboard.tsx(21,5): error TS2686: 'React' refers to a UMD global, but the current file is a module. Consider adding an import instead.
+src/pages/Dashboard.tsx(150,9): error TS2304: Cannot find name 'setIsLoading'.
+src/pages/Dashboard.tsx(186,13): error TS2304: Cannot find name 'setIsLoading'.
+src/pages/Dashboard.tsx(200,9): error TS2304: Cannot find name 'setIsLoading'.
+src/pages/Dashboard.tsx(240,13): error TS2304: Cannot find name 'setIsLoading'.
+src/pages/Dashboard.tsx(270,35): error TS2304: Cannot find name 'isLoading'.
+src/pages/Dashboard.tsx(342,83): error TS2552: Cannot find name 'stats'. Did you mean 'status'?
