@@ -95,6 +95,18 @@ class InvoiceUpdate(BaseModel):
         alias_generator = to_camel
         populate_by_name = True
 
+class Invoice(InvoiceBase):
+    id: str
+    created_at: datetime
+    line_items: List[LineItem] = []
+    category_summary: Optional[Dict[str, float]] = None
+
+    model_config = {
+        "from_attributes": True,
+        "populate_by_name": True,
+        "alias_generator": to_camel
+    }
+
 class InvoiceListResponse(BaseModel):
     items: List[Invoice]
     total: int
@@ -106,14 +118,14 @@ class InvoiceListResponse(BaseModel):
         "alias_generator": to_camel
     }
 
-class Invoice(InvoiceBase):
-    id: str
-    created_at: datetime
-    line_items: List[LineItem] = []
-    category_summary: Optional[Dict[str, float]] = None
+class DashboardStats(BaseModel):
+    total_invoices: int
+    needs_review: int
+    approved: int
+    issue_count: int
+    time_saved: str
 
     model_config = {
-        "from_attributes": True,
         "populate_by_name": True,
         "alias_generator": to_camel
     }

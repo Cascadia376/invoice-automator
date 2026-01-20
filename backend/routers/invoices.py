@@ -202,6 +202,33 @@ def read_invoices(
         "limit": limit
     }
 
+@router.get("/stats", response_model=schemas.DashboardStats)
+def get_dashboard_stats(
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """Get global statistics for the dashboard"""
+    base_query = db.query(models.Invoice).filter(models.Invoice.organization_id == ctx.org_id)
+    
+    total_invoices = base_query.count()
+    needs_review = base_query.filter(models.Invoice.status == 'needs_review').count()
+    approved = base_query.filter(or_(models.Invoice.status == 'approved', models.Invoice.status == 'pushed')).count()
+    
+    # Invoices with issues: an invoice is considered to have an issue if any of its line items have an issue_type
+    issue_count = base_query.filter(models.Invoice.line_items.any(models.LineItem.issue_type.isnot(None))).count()
+    
+    # Calculate time saved (15 mins per approved invoice)
+    hours_saved = (approved * 15) / 60
+    time_saved_str = f"{hours_saved:.1f}h"
+    
+    return {
+        "total_invoices": total_invoices,
+        "needs_review": needs_review,
+        "approved": approved,
+        "issue_count": issue_count,
+        "time_saved": time_saved_str
+    }
+
 @router.get("/{invoice_id}/file")
 def get_invoice_file(
     invoice_id: str,
@@ -371,6 +398,19 @@ def post_invoice_to_pos(
          db_invoice.file_url = f"/api/invoices/{db_invoice.id}/file"
          
     return db_invoice
+
+@router.patch("/bulk-post")
+def bulk_post_invoices(
+    invoice_ids: List[str],
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    db.query(models.Invoice).filter(
+        models.Invoice.id.in_(invoice_ids),
+        models.Invoice.organization_id == ctx.org_id
+    ).update({"is_posted": True}, synchronize_session=False)
+    db.commit()
+    return {"status": "success", "message": f"Marked {len(invoice_ids)} invoices as posted"}
 
 @router.get("/stats/category-summary")
 def get_category_summary(

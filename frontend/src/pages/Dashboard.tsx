@@ -3,7 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Search, Plus, Inbox, Beaker, MoreVertical, AlertCircle, Clock, FileText, FileDown, Trash2 } from "lucide-react";
+import { Search, Plus, Inbox, Beaker, MoreVertical, AlertCircle, Clock, FileText, FileDown, Trash2, CheckCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 export default function Dashboard() {
@@ -42,13 +42,8 @@ export default function Dashboard() {
         .filter(i => i.status === 'needs_review')
         .reduce((sum, i) => sum + i.totalAmount, 0);
 
-    const approvedAmount = invoices
-        .filter(i => i.status === 'approved')
-        .reduce((sum, i) => sum + i.totalAmount, 0);
-
-    const issueAmount = invoices
-        .filter(i => i.issues && i.issues.length > 0)
-        .reduce((sum, i) => sum + i.totalAmount, 0);
+    const approvedAmount = stats.approved; // Note: We might want currency stats too later
+    const issueAmount = stats.issueCount;
 
     const maxAmount = Math.max(pendingAmount, approvedAmount, issueAmount, 1); // Avoid div by 0
 
@@ -94,6 +89,47 @@ export default function Dashboard() {
         }
         setSelectedIds(new Set());
         toast.success("Invoices rejected");
+    };
+
+    const handleBulkPostToPos = async () => {
+        const ids = Array.from(selectedIds);
+        const approvedIds = invoices
+            .filter(i => ids.includes(i.id) && i.status === 'approved')
+            .map(i => i.id);
+
+        if (approvedIds.length === 0) {
+            toast.error("Only approved invoices can be posted to POS");
+            return;
+        }
+
+        if (approvedIds.length < ids.length) {
+            if (!confirm(`${ids.length - approvedIds.length} selected invoices are not approved and will be skipped. Continue?`)) return;
+        }
+
+        setIsLoading(true);
+        try {
+            const token = await getToken();
+            const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+            const response = await fetch(`${API_BASE}/api/invoices/bulk-post`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify(approvedIds)
+            });
+
+            if (!response.ok) throw new Error("Bulk post failed");
+
+            toast.success(`Marked ${approvedIds.length} invoices as posted`);
+            setSelectedIds(new Set());
+            // Refresh invoices to show updated state
+            refreshInvoices(0, pageSize, searchTerm, statusFilter);
+        } catch (error: any) {
+            toast.error(`Post failed: ${error.message}`);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleLoadDemo = async () => {
@@ -253,6 +289,10 @@ export default function Dashboard() {
                                 <FileDown className="h-4 w-4" />
                                 Export Excel ({selectedIds.size})
                             </button>
+                            <button onClick={handleBulkPostToPos} disabled={isLoading} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                                <CheckCircle className="h-4 w-4" />
+                                Post to POS ({selectedIds.size})
+                            </button>
                             <button onClick={handleBulkApprove} className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
                                 Approve ({selectedIds.size})
                             </button>
@@ -287,16 +327,15 @@ export default function Dashboard() {
             <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-4">
                 <div
                     onClick={() => {
-                        setStatusFilter('issue');
-                        setSearchTerm(""); // Clear search so we don't get stuck
+                        navigate("/issues");
                     }}
-                    className="cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md"
+                    className="cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-red-200"
                 >
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-gray-500">Issue Tracker</p>
                             <p className="mt-2 text-3xl font-bold text-gray-900">
-                                {invoices.filter(i => i.issues && i.issues.length > 0).length}
+                                {stats.issueCount}
                             </p>
                         </div>
                         <div className="rounded-full bg-red-50 p-3">
@@ -305,7 +344,7 @@ export default function Dashboard() {
                     </div>
                     <div className="mt-4 flex items-center text-sm text-red-600">
                         <span className="font-medium">
-                            {invoices.filter(i => i.issues && i.issues.length > 0).length} items
+                            {stats.issueCount} items
                         </span>
                         <span className="ml-2 text-gray-400">• Needs resolution</span>
                     </div>

@@ -16,6 +16,7 @@ interface InvoiceContextType {
     uploadInvoice: (file: File) => Promise<void>;
     deleteInvoice: (id: string) => void;
     refreshInvoices: (skip?: number, limit?: number, search?: string, status?: string) => Promise<void>;
+    refreshStats: () => Promise<void>;
     fetchGLCategories: () => Promise<void>;
     createGLCategory: (category: Omit<GLCategory, 'id'>) => Promise<void>;
     updateGLCategory: (id: string, category: Omit<GLCategory, 'id'>) => Promise<void>;
@@ -38,7 +39,8 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const [stats, setStats] = useState<DashboardStats>({
         totalInvoices: 0,
         needsReview: 0,
-        pushed: 0,
+        approved: 0,
+        issueCount: 0,
         timeSaved: '0h'
     });
     const [totalCount, setTotalCount] = useState(0);
@@ -46,9 +48,31 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const [pageSize, setPageSize] = useState(25);
     const [lastFilters, setLastFilters] = useState({ search: "", status: "all" });
 
+    const refreshStats = useCallback(async () => {
+        try {
+            const token = await getToken();
+            if (!token && !disableAuth) return;
+            const response = await fetch(`${API_URL}/invoices/stats`, {
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setStats(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch stats", error);
+        }
+    }, [getToken, disableAuth]);
+
     const refreshInvoices = useCallback(async (skip = 0, limit = 25, search = "", status = "all") => {
         setIsLoading(true);
         setLastFilters({ search, status });
+
+        // Also refresh stats whenever we refresh invoices to keep counts in sync
+        refreshStats();
+
         const queryParams = new URLSearchParams({
             skip: skip.toString(),
             limit: limit.toString(),
@@ -132,21 +156,8 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
     }, [user, orgId, disableAuth, refreshInvoices, fetchGLCategories]);
 
-    // Calculate stats whenever invoices change
-    useEffect(() => {
-        // Stats are a bit tricky with pagination if we only have current page's invoices
-        // Ideally the backend returns global stats. For now we use the totalCount for total.
-        const needsReview = invoices.filter(i => i.status === 'needs_review').length;
-        const approved = invoices.filter(i => i.status === 'approved' || i.status === 'pushed').length;
-
-        setStats(prev => ({
-            ...prev,
-            totalInvoices: totalCount,
-            needsReview: prev.needsReview, // These should ideally come from backend stats
-            pushed: approved,
-            timeSaved: `${((approved * 15) / 60).toFixed(1)}h`
-        }));
-    }, [invoices, totalCount]);
+    // Stats are now fetched globally from the backend, so we don't need to recalculate them here
+    // based on the current page's invoices.
 
     const getInvoice = useCallback((id: string) => invoices.find(i => i.id === id), [invoices]);
 
@@ -339,6 +350,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             uploadInvoice,
             deleteInvoice,
             refreshInvoices,
+            refreshStats,
             fetchGLCategories,
             createGLCategory,
             updateGLCategory,

@@ -81,6 +81,7 @@ export interface GLCategory {
 export interface DashboardStats {
   totalInvoices: number;
   needsReview: number;
-  pushed: number;
+  approved: number;
+  issueCount: number;
   timeSaved: string;
 }
