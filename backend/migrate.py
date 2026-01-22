@@ -141,7 +141,8 @@ def migrate():
             ("vendor_id", "VARCHAR REFERENCES vendors(id)"),
             ("raw_extraction_results", "VARCHAR"),
             ("po_number", "VARCHAR"),
-            ("ldb_report_url", "VARCHAR")
+            ("ldb_report_url", "VARCHAR"),
+            ("is_posted", "BOOLEAN DEFAULT FALSE")
         ]
 
         for col_name, col_type in invoice_columns:
