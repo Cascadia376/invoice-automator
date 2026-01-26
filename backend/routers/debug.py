@@ -108,3 +108,33 @@ def inspect_schema(db: Session = Depends(get_db)):
         "tables": tables,
         "schema": schema_info
     }
+
+class SQLRequest(models.BaseModel):
+    query: str
+
+@router.post("/api/debug/sql")
+def execute_raw_sql(
+    sql_req: SQLRequest,
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """
+    Emergency endpoint to run raw SQL. 
+    Use with EXTREME CAUTION.
+    """
+    from sqlalchemy import text
+    try:
+        result = db.execute(text(sql_req.query))
+        db.commit()
+        
+        # Try to fetch results if it's a SELECT
+        try:
+            keys = result.keys()
+            rows = [dict(zip(keys, row)) for row in result.fetchall()]
+            return {"status": "success", "rows": rows}
+        except:
+            return {"status": "success", "message": "Command executed, no rows returned"}
+            
+    except Exception as e:
+        import traceback
+        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}

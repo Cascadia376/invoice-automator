@@ -198,19 +198,27 @@ def migrate():
         ]
         
         for table in tables_to_migrate:
+            print(f"Updating organization_id in {table}...")
+            # Check if column exists first to avoid error spam if using postgres
+            # But for now, let's just try-except with explicit error printing
             try:
-                print(f"Updating organization_id in {table}...")
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN organization_id VARCHAR DEFAULT 'dev-org'"))
                 conn.commit()
             except Exception as e:
-                pass
+                # If it's "duplicate column", ignore. Else raise.
+                err_str = str(e).lower()
+                if "duplicate column" in err_str or "already exists" in err_str:
+                    print(f"Column organization_id already exists in {table}")
+                else:
+                    print(f"ERROR adding organization_id to {table}: {e}")
+                    raise e
             
             try:
                 conn.execute(text(f"UPDATE {table} SET organization_id = 'dev-org' WHERE organization_id = 'default_org' OR organization_id IS NULL"))
                 conn.execute(text(f"CREATE INDEX IF NOT EXISTS ix_{table}_organization_id ON {table} (organization_id)"))
                 conn.commit()
             except Exception as e:
-                pass
+                print(f"Index/Update error on {table}: {e}")
 
     print("Consolidated Migration complete!")
 
