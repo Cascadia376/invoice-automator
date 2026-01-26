@@ -1,5 +1,5 @@
 import { Home, Upload, Settings, AlertCircle, TrendingUp } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,12 @@ export function AppHeader() {
         { icon: Upload, label: "Upload", href: "/upload" },
         { icon: Settings, label: "Settings", href: "/settings" },
     ];
+    const navigate = useNavigate();
+
+    const handleLogout = async () => {
+        await signOut();
+        navigate("/login");
+    };
 
     return (
         <header className="border-b bg-card sticky top-0 z-10">
@@ -47,7 +53,7 @@ export function AppHeader() {
                     <span className="text-sm text-muted-foreground hidden sm:inline-block">
                         {user?.email || "Signed in"}
                     </span>
-                    <Button variant="outline" size="sm" onClick={signOut}>
+                    <Button variant="outline" size="sm" onClick={handleLogout}>
                         Sign out
                     </Button>
                 </div>

@@ -52,6 +52,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = useCallback(async () => {
     if (disableAuth) return;
     await supabase.auth.signOut();
+    setSession(null);
+    setUser(null);
   }, [disableAuth]);
 
   return (

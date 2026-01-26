@@ -170,37 +170,43 @@ def read_invoices(
     ctx: auth.UserContext = Depends(auth.get_current_user)
 ):
     print(f"FETCH REQUEST: User={ctx.user_id}, Org={ctx.org_id}, Skip={skip}, Limit={limit}, Search={search}, Status={status}")
-    query = db.query(models.Invoice).filter(models.Invoice.organization_id == ctx.org_id)
-    
-    if search:
-        query = query.filter(
-            or_(
-                models.Invoice.invoice_number.ilike(f"%{search}%"),
-                models.Invoice.vendor_name.ilike(f"%{search}%")
+    try:
+        query = db.query(models.Invoice).filter(models.Invoice.organization_id == ctx.org_id)
+        
+        if search:
+            query = query.filter(
+                or_(
+                    models.Invoice.invoice_number.ilike(f"%{search}%"),
+                    models.Invoice.vendor_name.ilike(f"%{search}%")
+                )
             )
-        )
-    
-    if status and status != 'all':
-        # Handle custom 'issue' status which might be defined as invoices with issues
-        if status == 'issue':
-            query = query.filter(models.Invoice.line_items.any(models.LineItem.issue_type.isnot(None)))
-        else:
-            query = query.filter(models.Invoice.status == status)
-            
-    total = query.count()
-    invoices = query.order_by(models.Invoice.created_at.desc()).offset(skip).limit(limit).all()
-    
-    # Point to proxy endpoint
-    for inv in invoices:
-        if inv.file_url:
-             inv.file_url = f"/api/invoices/{inv.id}/file"
-             
-    return {
-        "items": invoices,
-        "total": total,
-        "skip": skip,
-        "limit": limit
-    }
+        
+        if status and status != 'all':
+            # Handle custom 'issue' status which might be defined as invoices with issues
+            if status == 'issue':
+                query = query.filter(models.Invoice.line_items.any(models.LineItem.issue_type.isnot(None)))
+            else:
+                query = query.filter(models.Invoice.status == status)
+                
+        total = query.count()
+        invoices = query.order_by(models.Invoice.created_at.desc()).offset(skip).limit(limit).all()
+        
+        # Point to proxy endpoint
+        for inv in invoices:
+            if inv.file_url:
+                 inv.file_url = f"/api/invoices/{inv.id}/file"
+                 
+        return {
+            "items": invoices,
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+    except Exception as e:
+        print(f"ERROR fetching invoices: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/stats", response_model=schemas.DashboardStats)
 def get_dashboard_stats(
