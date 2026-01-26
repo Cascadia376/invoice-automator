@@ -3,7 +3,7 @@ Database migration script to add new columns to invoices table.
 Run this once to update the schema.
 """
 import os
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, inspect
 
 # Get DB URL from env
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -23,20 +23,19 @@ import models
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
 
 def migrate():
-    # Ensure all tables exist first
-    # models.Base.metadata.create_all(bind=engine)
-    
+    inspector = inspect(engine)
+    existing_tables = inspector.get_table_names()
+
     with engine.connect() as conn:
         print("Starting consolidated migration...")
 
-        # 1. NEW TABLES (from various migration scripts)
-        # We manually create some to ensure specific constraints if metadata.create_all isn't enough or clear
+        # 1. NEW TABLES 
         
         # gl_categories
-        try:
+        if "gl_categories" not in existing_tables:
             print("Creating gl_categories table...")
             conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS gl_categories (
+                CREATE TABLE gl_categories (
                     id VARCHAR PRIMARY KEY,
                     organization_id VARCHAR DEFAULT 'dev-org',
                     code VARCHAR NOT NULL,
@@ -46,14 +45,12 @@ def migrate():
                 )
             """))
             conn.commit()
-        except Exception as e:
-            print(f"Note: gl_categories table creation: {e}")
-
+        
         # sku_category_mappings
-        try:
+        if "sku_category_mappings" not in existing_tables:
             print("Creating sku_category_mappings table...")
             conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS sku_category_mappings (
+                CREATE TABLE sku_category_mappings (
                     id VARCHAR PRIMARY KEY,
                     organization_id VARCHAR DEFAULT 'dev-org',
                     sku VARCHAR NOT NULL,
@@ -64,14 +61,12 @@ def migrate():
             """))
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_sku_mappings_sku ON sku_category_mappings(sku)"))
             conn.commit()
-        except Exception as e:
-            print(f"Note: sku_category_mappings table creation: {e}")
 
         # issues
-        try:
+        if "issues" not in existing_tables:
             print("Creating issues table...")
             conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS issues (
+                CREATE TABLE issues (
                     id VARCHAR PRIMARY KEY,
                     organization_id VARCHAR NOT NULL,
                     invoice_id VARCHAR NOT NULL,
@@ -89,14 +84,12 @@ def migrate():
                 )
             """))
             conn.commit()
-        except Exception as e:
-            print(f"Note: issues table creation: {e}")
 
         # issue_communications
-        try:
+        if "issue_communications" not in existing_tables:
             print("Creating issue_communications table...")
             conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS issue_communications (
+                CREATE TABLE issue_communications (
                     id VARCHAR PRIMARY KEY,
                     issue_id VARCHAR NOT NULL,
                     organization_id VARCHAR NOT NULL,
@@ -109,14 +102,12 @@ def migrate():
                 )
             """))
             conn.commit()
-        except Exception as e:
-            print(f"Note: issue_communications table creation: {e}")
 
         # issue_line_items (Association)
-        try:
+        if "issue_line_items" not in existing_tables:
             print("Creating issue_line_items table...")
             conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS issue_line_items (
+                CREATE TABLE issue_line_items (
                     issue_id VARCHAR NOT NULL,
                     line_item_id VARCHAR NOT NULL,
                     PRIMARY KEY (issue_id, line_item_id),
@@ -125,10 +116,16 @@ def migrate():
                 )
             """))
             conn.commit()
-        except Exception as e:
-            print(f"Note: issue_line_items table creation: {e}")
 
         # 2. COLUMN ADDITIONS
+        
+        def safe_add_column(table_name, col_name, col_type):
+            # Refresh inspector columns
+            columns = [c["name"] for c in inspect(engine).get_columns(table_name)]
+            if col_name not in columns:
+                print(f"Adding {col_name} to {table_name}...")
+                conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}"))
+                conn.commit()
         
         # Invoices Table Extras
         invoice_columns = [
@@ -142,16 +139,13 @@ def migrate():
             ("raw_extraction_results", "VARCHAR"),
             ("po_number", "VARCHAR"),
             ("ldb_report_url", "VARCHAR"),
-            ("is_posted", "BOOLEAN DEFAULT FALSE")
+            ("is_posted", "BOOLEAN DEFAULT FALSE"),
+            ("organization_id", "VARCHAR DEFAULT 'dev-org'") # Ensure this is here
         ]
 
-        for col_name, col_type in invoice_columns:
-            try:
-                print(f"Checking {col_name} in invoices...")
-                conn.execute(text(f"ALTER TABLE invoices ADD COLUMN {col_name} {col_type}"))
-                conn.commit()
-            except Exception as e:
-                pass # Already exists or constraint issue
+        if "invoices" in existing_tables:
+            for col, dtype in invoice_columns:
+                safe_add_column("invoices", col, dtype)
 
         # Line Items Table Extras
         line_item_columns = [
@@ -164,29 +158,26 @@ def migrate():
             ("issue_type", "VARCHAR"),
             ("issue_status", "VARCHAR DEFAULT 'open'"),
             ("issue_description", "VARCHAR"),
-            ("issue_notes", "VARCHAR")
+            ("issue_notes", "VARCHAR"),
+            ("organization_id", "VARCHAR DEFAULT 'dev-org'") # Ensure this is here
         ]
         
-        for col_name, col_type in line_item_columns:
-            try:
-                print(f"Checking {col_name} in line_items...")
-                conn.execute(text(f"ALTER TABLE line_items ADD COLUMN {col_name} {col_type}"))
-                conn.commit()
-            except Exception as e:
-                pass
+        if "line_items" in existing_tables:
+            for col, dtype in line_item_columns:
+                safe_add_column("line_items", col, dtype)
 
         # Renames (Line Items)
-        try:
-            print("Checking for unit_price -> unit_cost rename...")
-            conn.execute(text("ALTER TABLE line_items RENAME COLUMN unit_price TO unit_cost"))
-            conn.commit()
-        except Exception as e:
-            pass
+        if "line_items" in existing_tables:
+            li_cols = [c["name"] for c in inspect(engine).get_columns("line_items")]
+            if "unit_price" in li_cols and "unit_cost" not in li_cols:
+                print("Renaming unit_price -> unit_cost in line_items...")
+                conn.execute(text("ALTER TABLE line_items RENAME COLUMN unit_price TO unit_cost"))
+                conn.commit()
 
         # 3. Add organization_id to all relevant tables (Safe multisubs support)
+        # We already handled invoices and line_items above, but let's do the others locally
         tables_to_migrate = [
-            "invoices", 
-            "line_items",
+            # "invoices", "line_items", # Done above
             "gl_categories", 
             "sku_category_mappings", 
             "templates",
@@ -198,27 +189,17 @@ def migrate():
         ]
         
         for table in tables_to_migrate:
-            print(f"Updating organization_id in {table}...")
-            # Check if column exists first to avoid error spam if using postgres
-            # But for now, let's just try-except with explicit error printing
-            try:
-                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN organization_id VARCHAR DEFAULT 'dev-org'"))
-                conn.commit()
-            except Exception as e:
-                # If it's "duplicate column", ignore. Else raise.
-                err_str = str(e).lower()
-                if "duplicate column" in err_str or "already exists" in err_str:
-                    print(f"Column organization_id already exists in {table}")
-                else:
-                    print(f"ERROR adding organization_id to {table}: {e}")
-                    raise e
-            
-            try:
-                conn.execute(text(f"UPDATE {table} SET organization_id = 'dev-org' WHERE organization_id = 'default_org' OR organization_id IS NULL"))
-                conn.execute(text(f"CREATE INDEX IF NOT EXISTS ix_{table}_organization_id ON {table} (organization_id)"))
-                conn.commit()
-            except Exception as e:
-                print(f"Index/Update error on {table}: {e}")
+            if table in existing_tables:
+                safe_add_column(table, "organization_id", "VARCHAR DEFAULT 'dev-org'")
+                
+                # Backfill and Index
+                try:
+                    conn.execute(text(f"UPDATE {table} SET organization_id = 'dev-org' WHERE organization_id = 'default_org' OR organization_id IS NULL"))
+                    conn.execute(text(f"CREATE INDEX IF NOT EXISTS ix_{table}_organization_id ON {table} (organization_id)"))
+                    conn.commit()
+                except Exception as e:
+                    print(f"Index/Update warning on {table}: {e}")
+                    conn.rollback()
 
     print("Consolidated Migration complete!")
 
