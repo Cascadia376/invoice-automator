@@ -40,8 +40,8 @@ class LineItem(LineItemBase):
     }
 
 class InvoiceBase(BaseModel):
-    invoice_number: str
-    vendor_name: str
+    invoice_number: Optional[str] = "UNKNOWN"
+    vendor_name: Optional[str] = "Unknown Vendor"
     vendor_email: Optional[str] = None
     vendor_address: Optional[str] = None
     date: Optional[str] = None
