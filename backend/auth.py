@@ -96,3 +96,50 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials"
         )
+
+def require_role(role_name: str):
+    def role_checker(
+        ctx: UserContext = Depends(get_current_user),
+        db = Depends('database.get_db') # Lazy import using string or need to handle cyclic import carefully
+    ):
+        # We need to query DB to check role.
+        # Ideally, roles would be in JWT, but for now we look them up.
+        from database import get_db
+        # We need to manually get session since Depends() in nested function is tricky? 
+        # Actually, FastAPI handles dependency injection in sub-dependencies.
+        # But `require_role` returns the `role_checker` dependency.
+        return RoleChecker(role_name)
+    return role_checker
+
+class RoleChecker:
+    def __init__(self, allowed_role: str):
+        self.allowed_role = allowed_role
+
+    def __call__(self, ctx: UserContext = Depends(get_current_user), db = Depends('database.get_db')):
+        # Import models inside to avoid circular import if auth is imported by models (unlikely but safe)
+        import models
+        
+        # Check if user has the role
+        has_role = db.query(models.UserRole).filter(
+            models.UserRole.user_id == ctx.user_id,
+            models.UserRole.role_id == self.allowed_role,
+            models.UserRole.organization_id == ctx.org_id
+        ).first()
+        
+        if not has_role:
+             # Allow admins to access everything? Maybe. For now, strict check.
+             # Check if user is admin if they are requesting something else
+             if self.allowed_role != "admin":
+                 is_admin = db.query(models.UserRole).filter(
+                    models.UserRole.user_id == ctx.user_id,
+                    models.UserRole.role_id == "admin",
+                    models.UserRole.organization_id == ctx.org_id
+                ).first()
+                 if is_admin:
+                     return True
+
+             raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail=f"Operation requires {self.allowed_role} role"
+            )
+        return True

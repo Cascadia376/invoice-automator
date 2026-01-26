@@ -43,6 +43,22 @@ const RequireAuth = () => {
   return <Outlet />;
 };
 
+const RequireRole = ({ role }: { role: string }) => {
+  const { loading, roles, isAdmin } = useAuth();
+
+  if (loading) return <div>Loading...</div>;
+
+  if (role === 'admin' && !isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (!roles.includes(role) && !isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <Outlet />;
+};
+
 const App = () => {
   return (
     <AuthProvider>
@@ -66,7 +82,10 @@ const App = () => {
                     <Route path="/vendors" element={<Vendors />} />
                     <Route path="/ap-view" element={<APSageView />} />
                     <Route path="/ap-pos-view" element={<APPosView />} />
-                    <Route path="/settings" element={<Settings />} />
+                    <Route path="/ap-pos-view" element={<APPosView />} />
+                    <Route element={<RequireRole role="admin" />}>
+                      <Route path="/settings" element={<Settings />} />
+                    </Route>
                   </Route>
                   <Route path="/invoices/:id" element={<InvoiceReview />} />
                   <Route path="/invoices/:id/pdf" element={<PDFViewOnly />} />

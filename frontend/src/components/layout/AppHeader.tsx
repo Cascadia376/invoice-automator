@@ -5,19 +5,21 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 
 export function AppHeader() {
-    const { user, signOut } = useAuth();
+    const { user, signOut, isAdmin } = useAuth();
     const navItems = [
         { icon: Home, label: "Dashboard", href: "/dashboard" },
         { icon: AlertCircle, label: "Issue Tracker", href: "/issues" },
         { icon: TrendingUp, label: "AP View", href: "/ap-pos-view" },
         { icon: Upload, label: "Upload", href: "/upload" },
-        { icon: Settings, label: "Settings", href: "/settings" },
+        // Only show Settings to Admins
+        ...(isAdmin ? [{ icon: Settings, label: "Settings", href: "/settings" }] : []),
     ];
     const navigate = useNavigate();
 
     const handleLogout = async () => {
         await signOut();
-        navigate("/");
+        // Force full reload to verify state clear
+        window.location.href = "/";
     };
 
     return (

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 import models, database
-from routers import invoices, vendors, gl_categories, debug, issues
+from routers import invoices, vendors, gl_categories, debug, issues, admin
 
 models.Base.metadata.create_all(bind=database.engine)
 
@@ -69,6 +69,7 @@ app.include_router(invoices.router)
 app.include_router(vendors.router)
 app.include_router(gl_categories.router)
 app.include_router(issues.router)
+app.include_router(admin.router)
 app.include_router(debug.router)
 
 @app.get("/")
