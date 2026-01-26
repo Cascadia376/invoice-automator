@@ -97,25 +97,16 @@ async def get_current_user(
             detail="Could not validate credentials"
         )
 
+from database import get_db
+
 def require_role(role_name: str):
-    def role_checker(
-        ctx: UserContext = Depends(get_current_user),
-        db = Depends('database.get_db') # Lazy import using string or need to handle cyclic import carefully
-    ):
-        # We need to query DB to check role.
-        # Ideally, roles would be in JWT, but for now we look them up.
-        from database import get_db
-        # We need to manually get session since Depends() in nested function is tricky? 
-        # Actually, FastAPI handles dependency injection in sub-dependencies.
-        # But `require_role` returns the `role_checker` dependency.
-        return RoleChecker(role_name)
-    return role_checker
+    return RoleChecker(role_name)
 
 class RoleChecker:
     def __init__(self, allowed_role: str):
         self.allowed_role = allowed_role
 
-    def __call__(self, ctx: UserContext = Depends(get_current_user), db = Depends('database.get_db')):
+    def __call__(self, ctx: UserContext = Depends(get_current_user), db = Depends(get_db)):
         # Import models inside to avoid circular import if auth is imported by models (unlikely but safe)
         import models
         
