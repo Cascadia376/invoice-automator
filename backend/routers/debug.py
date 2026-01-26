@@ -109,7 +109,9 @@ def inspect_schema(db: Session = Depends(get_db)):
         "schema": schema_info
     }
 
-class SQLRequest(models.BaseModel):
+from pydantic import BaseModel
+
+class SQLRequest(BaseModel):
     query: str
 
 @router.post("/api/debug/sql")
