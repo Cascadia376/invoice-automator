@@ -26,15 +26,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Fetch roles from backend
   const fetchRoles = async (userId: string, orgId: string, token: string) => {
     try {
+      console.log(`[AuthDebug] Fetching roles for User: ${userId}, Org: ${orgId}`);
       const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/users/me/roles`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
+        console.log("[AuthDebug] Roles received:", data.roles);
         setRoles(data.roles || []);
+      } else {
+        console.error("[AuthDebug] Failed to fetch roles:", res.status, await res.text());
       }
     } catch (e) {
-      console.error("Error fetching roles", e);
+      console.error("[AuthDebug] Error fetching roles", e);
     }
   };
 
