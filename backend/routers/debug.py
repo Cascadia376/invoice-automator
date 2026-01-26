@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 import os
 
-import models, auth
+import models, auth, migrate
 from database import get_db
 from services import demo_service
 
@@ -74,3 +74,17 @@ def seed_demo_invoice(
     """
     invoice = demo_service.seed_demo_data(db, ctx.org_id)
     return {"message": "Demo invoice created", "invoice_id": invoice.id}
+
+@router.post("/api/debug/migrate")
+def trigger_migration():
+    """
+    Manually trigger database migration to ensure schema consistency.
+    Useful for environments like Render where shell access might be limited.
+    """
+    try:
+        migrate.migrate()
+        return {"status": "success", "message": "Migration completed successfully"}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}

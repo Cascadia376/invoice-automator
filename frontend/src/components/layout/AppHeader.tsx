@@ -17,7 +17,7 @@ export function AppHeader() {
 
     const handleLogout = async () => {
         await signOut();
-        navigate("/login");
+        navigate("/");
     };
 
     return (
