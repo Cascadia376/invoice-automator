@@ -7,13 +7,13 @@ def to_camel(string: str) -> str:
 
 class LineItemBase(BaseModel):
     sku: Optional[str] = None
-    description: str
+    description: Optional[str] = "Unknown Item"
     units_per_case: float = 1.0
     cases: float = 0.0
-    quantity: float
+    quantity: Optional[float] = 0.0
     case_cost: Optional[float] = None
-    unit_cost: float
-    amount: float
+    unit_cost: Optional[float] = 0.0
+    amount: Optional[float] = 0.0
     category_gl_code: Optional[str] = None
     confidence_score: float = 1.0
     issue_type: Optional[str] = None # breakage, shortship, overship, misship
@@ -44,15 +44,15 @@ class InvoiceBase(BaseModel):
     vendor_name: str
     vendor_email: Optional[str] = None
     vendor_address: Optional[str] = None
-    date: str
+    date: Optional[str] = None
     due_date: Optional[str] = None
-    total_amount: float
+    total_amount: Optional[float] = 0.0
     subtotal: Optional[float] = 0.0
     shipping_amount: Optional[float] = 0.0
     discount_amount: Optional[float] = 0.0
-    tax_amount: float
+    tax_amount: Optional[float] = 0.0
     deposit_amount: Optional[float] = 0.0
-    currency: str = "CAD"
+    currency: Optional[str] = "CAD"
     po_number: Optional[str] = None
     status: str
     file_url: Optional[str] = None
