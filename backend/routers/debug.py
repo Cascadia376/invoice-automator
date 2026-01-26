@@ -88,3 +88,23 @@ def trigger_migration():
         import traceback
         traceback.print_exc()
         return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
+
+@router.get("/api/debug/schema")
+def inspect_schema(db: Session = Depends(get_db)):
+    """
+    Inspect the database schema to verify columns exist.
+    """
+    from sqlalchemy import inspect
+    inspector = inspect(db.get_bind())
+    
+    tables = inspector.get_table_names()
+    schema_info = {}
+    
+    for table in tables:
+        columns = [col["name"] for col in inspector.get_columns(table)]
+        schema_info[table] = columns
+        
+    return {
+        "tables": tables,
+        "schema": schema_info
+    }
