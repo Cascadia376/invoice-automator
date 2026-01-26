@@ -201,6 +201,40 @@ def migrate():
                     print(f"Index/Update warning on {table}: {e}")
                     conn.rollback()
 
+                    conn.rollback()
+
+        # 4. RBAC TABLES
+        if "roles" not in existing_tables:
+            print("Creating roles table...")
+            conn.execute(text("""
+                CREATE TABLE roles (
+                    id VARCHAR PRIMARY KEY,
+                    name VARCHAR,
+                    description VARCHAR
+                )
+            """))
+            # Seed default roles
+            print("Seeding default roles...")
+            conn.execute(text("INSERT INTO roles (id, name, description) VALUES ('admin', 'Administrator', 'Full access to all settings and users')"))
+            conn.execute(text("INSERT INTO roles (id, name, description) VALUES ('manager', 'Manager', 'Can approve invoices and manage vendors')"))
+            conn.execute(text("INSERT INTO roles (id, name, description) VALUES ('staff', 'Staff', 'Can view and upload invoices')"))
+            conn.commit()
+
+        if "user_roles" not in existing_tables:
+            print("Creating user_roles table...")
+            conn.execute(text("""
+                CREATE TABLE user_roles (
+                    user_id VARCHAR NOT NULL,
+                    role_id VARCHAR NOT NULL,
+                    organization_id VARCHAR NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (user_id, role_id, organization_id),
+                    FOREIGN KEY (role_id) REFERENCES roles(id)
+                )
+            """))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_roles_user_id ON user_roles (user_id)"))
+            conn.commit()
+
     print("Consolidated Migration complete!")
 
 if __name__ == "__main__":

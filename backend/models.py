@@ -210,3 +210,19 @@ class IssueCommunication(Base):
     created_by = Column(String, nullable=True) # user_id
 
     issue = relationship("Issue", back_populates="communications")
+
+class Role(Base):
+    __tablename__ = "roles"
+
+    id = Column(String, primary_key=True, index=True) # e.g. "admin", "manager", "staff"
+    name = Column(String)
+    description = Column(String, nullable=True)
+
+class UserRole(Base):
+    __tablename__ = "user_roles"
+
+    user_id = Column(String, primary_key=True, index=True)
+    role_id = Column(String, ForeignKey("roles.id"), primary_key=True)
+    organization_id = Column(String, primary_key=True, index=True) # Roles are org-specific
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
