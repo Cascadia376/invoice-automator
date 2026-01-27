@@ -73,7 +73,7 @@ def health_check():
         "auth_required": auth.AUTH_REQUIRED,
         "supabase_url": bool(auth.SUPABASE_URL),
         "supabase_jwt_secret_present": bool(auth.SUPABASE_JWT_SECRET),
-        "jwks_client_ready": bool(auth.jwks_client)
+        "jwks_client_ready": bool(auth.jwks_cache.currsize > 0 if hasattr(auth.jwks_cache, "currsize") else "jwks" in auth.jwks_cache)
     }
 
 @app.get("/whoami")
