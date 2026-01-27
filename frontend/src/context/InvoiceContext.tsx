@@ -66,7 +66,20 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
     }, [getToken, disableAuth]);
 
+    const [retryCount, setRetryCount] = useState(0);
+
     const refreshInvoices = useCallback(async (skip = 0, limit = 25, search = "", status = "all") => {
+        // Prevent infinite loops if we've failed too many times
+        if (retryCount > 3) {
+            console.error("DEBUG: Max retries reached for fetching invoices. Stopping.");
+            // Only toast once to avoid spam
+            if (retryCount === 4) {
+                toast.error("Unable to connect to server. Please refresh the page manually.");
+                setRetryCount(5); // Increment to ensure we don't toast again
+            }
+            return;
+        }
+
         setIsLoading(true);
         setLastFilters({ search, status });
 
@@ -97,6 +110,9 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 const data = await response.json();
                 console.log("DEBUG: Fetched invoices:", data);
 
+                // Success! Reset retry count
+                setRetryCount(0);
+
                 if (Array.isArray(data)) {
                     // Backwards compatibility for old array response
                     setInvoices(data);
@@ -111,13 +127,19 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 }
             } else {
                 console.error(`DEBUG: Failed to fetch invoices. Status: ${response.status}`);
+                // Increment retry count on server error
+                if (response.status >= 500) {
+                    setRetryCount(prev => prev + 1);
+                }
             }
         } catch (error) {
             console.error(`DEBUG: Network or Fetch error:`, error);
+            // Increment retry count on network error
+            setRetryCount(prev => prev + 1);
         } finally {
             setIsLoading(false);
         }
-    }, [getToken, disableAuth]);
+    }, [getToken, disableAuth, retryCount, refreshStats]); // Added retryCount and refreshStats to deps
 
     const setPage = useCallback((page: number) => {
         const skip = (page - 1) * pageSize;

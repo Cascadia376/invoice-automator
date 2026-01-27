@@ -64,7 +64,7 @@ if "postgresql" in SQLALCHEMY_DATABASE_URL:
         "pool_size": 15,
         "max_overflow": 5,
         "pool_pre_ping": True,
-        "pool_recycle": 1800  # Recycle connections every 30 mins
+        "pool_recycle": 300  # Recycle connections every 5 mins to avoid Supabase idle timeouts
     })
 
 engine = create_engine(
