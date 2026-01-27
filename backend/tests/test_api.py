@@ -3,7 +3,7 @@ def test_read_main(client):
     assert response.status_code == 200
     response_json = response.json()
     assert response_json["status"] == "ok"
-    assert response_json["version"] == "1.0.0"
+    assert response_json["version"] == "1.1.0"
     assert "database" in response_json
 
 def test_read_vendors_empty(client):
@@ -14,7 +14,10 @@ def test_read_vendors_empty(client):
 def test_read_invoices_empty(client):
     response = client.get("/api/invoices")
     assert response.status_code == 200
-    assert isinstance(response.json(), list)
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "items" in data
+    assert isinstance(data["items"], list)
 
 def test_gl_categories_crud(client):
     # Create

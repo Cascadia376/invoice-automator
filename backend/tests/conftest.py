@@ -38,6 +38,15 @@ def db_session():
         db.close()
         Base.metadata.drop_all(bind=engine)
 
+@pytest.fixture(autouse=True)
+def reset_auth_state():
+    """Reset auth module variables before every test to prevent pollution."""
+    auth.DISABLE_AUTH = True
+    auth.AUTH_REQUIRED = False
+    auth.AUTH_MODE = "strict"
+    # Note: SUPABASE_JWT_SECRET is not reset as it's often not critical for bypass tests
+    yield
+
 @pytest.fixture(scope="module")
 def client(db_session):
     # Override generic DB dependency
@@ -48,9 +57,6 @@ def client(db_session):
             pass
     
     app.dependency_overrides[get_db] = override_get_db
-    
-    # Bypass Auth explicit patch
-    auth.DISABLE_AUTH = True
     
     with TestClient(app) as c:
         yield c
