@@ -85,15 +85,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [disableAuth]);
 
   const signOut = useCallback(async () => {
-    if (disableAuth) return;
-
-    console.log("[AuthDebug] Initiating Sign Out");
+    console.log("[AuthDebug] Initiating Sign Out (disableAuth:", disableAuth, ")");
     setLoading(true);
 
     try {
       // Use global scope to ensure server-side session is also invalidated
-      const { error } = await supabase.auth.signOut({ scope: "global" });
-      if (error) console.error("Supabase signOut error:", error);
+      // Only call API if auth is enabled
+      if (!disableAuth) {
+        const { error } = await supabase.auth.signOut({ scope: "global" });
+        if (error) console.error("Supabase signOut error:", error);
+      }
     } catch (e) {
       console.error("Error signing out:", e);
     }
