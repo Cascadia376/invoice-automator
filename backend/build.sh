@@ -14,7 +14,7 @@ cat requirements.txt
 
 echo "Installing dependencies..."
 pip install --upgrade pip
-pip install -v -r requirements.txt
+pip install -r requirements.txt
 
 # Explicitly try installing openai if it's missing
 if ! python -c "import openai" &> /dev/null; then
