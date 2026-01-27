@@ -4,6 +4,8 @@ from typing import List
 import models, schemas, auth
 from database import get_db
 from pydantic import BaseModel
+import os
+from supabase import create_client, Client
 
 router = APIRouter(
     prefix="/api",
@@ -12,6 +14,10 @@ router = APIRouter(
 
 class RoleUpdate(BaseModel):
     roles: List[str]
+
+class UserInvite(BaseModel):
+    email: str
+    role: str
 
 @router.get("/users/me/roles")
 def get_my_roles(
@@ -79,3 +85,66 @@ def update_user_roles(
         
     db.commit()
     return {"status": "success", "roles": role_data.roles}
+
+@router.post("/admin/users", dependencies=[Depends(auth.require_role("admin"))])
+def invite_user(
+    invite_data: UserInvite,
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """Invite a new user via Supabase and assign a role"""
+    
+    # 1. Initialize Supabase Admin Client
+    # Only initialize if we have the service key
+    supabase_url = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL") # Fallback to VITE_ var if shared env
+    supabase_service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    
+    if not supabase_url or not supabase_service_key:
+        print("ERROR: Missing SUPABASE_SERVICE_ROLE_KEY")
+        raise HTTPException(
+            status_code=500, 
+            detail="Server configuration error: Missing Supabase Admin Keys"
+        )
+        
+    try:
+        supabase: Client = create_client(supabase_url, supabase_service_key)
+        
+        # 2. Invite User
+        # This sends a magic link to the user
+        print(f"Inviting user: {invite_data.email}")
+        response = supabase.auth.admin.invite_user_by_email(invite_data.email)
+        user = response.user
+        
+        if not user:
+             raise Exception("No user returned from invite request")
+
+    except Exception as e:
+        print(f"Supabase Invite Error: {e}")
+        # Fallback: Check if we can get the user by email (maybe they already exist?)
+        # Only if the error suggests they exist, but for now just fail safely
+        raise HTTPException(status_code=400, detail=f"Failed to invite user: {str(e)}")
+
+    # 3. Add Role
+    # Check if role exists for this user in this org
+    existing_role = db.query(models.UserRole).filter(
+        models.UserRole.user_id == user.id,
+        models.UserRole.organization_id == ctx.org_id
+    ).first()
+    
+    if existing_role:
+        existing_role.role_id = invite_data.role
+    else:
+        new_role = models.UserRole(
+            user_id=user.id,
+            role_id=invite_data.role,
+            organization_id=ctx.org_id
+        )
+        db.add(new_role)
+    
+    db.commit()
+    
+    return {
+        "status": "success", 
+        "message": f"User {invite_data.email} invited and assigned role {invite_data.role}", 
+        "user": {"id": user.id, "email": user.email}
+    }

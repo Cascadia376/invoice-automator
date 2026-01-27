@@ -18,8 +18,7 @@ export function AppHeader() {
 
     const handleLogout = async () => {
         await signOut();
-        // Force full reload to verify state clear
-        window.location.href = "/";
+        navigate("/", { replace: true });
     };
 
     return (

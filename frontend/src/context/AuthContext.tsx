@@ -93,11 +93,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Manually clear Supabase tokens from localStorage to prevent "zombie" sessions
+    // Manually clear Supabase tokens from localStorage to prevent "zombie" sessions
     Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith("sb-") && key.endsWith("-auth-token")) {
+      if (key.startsWith("sb-")) {
         localStorage.removeItem(key);
       }
     });
+
+    // Also clear session storage just in case
+    sessionStorage.clear();
 
     setSession(null);
     setUser(null);
