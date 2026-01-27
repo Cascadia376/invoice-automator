@@ -5,7 +5,17 @@ import models, schemas, auth
 from database import get_db
 from pydantic import BaseModel
 import os
-from supabase import create_client, Client
+
+def get_supabase_admin() -> Client:
+    supabase_url = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL")
+    supabase_service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not supabase_url or not supabase_service_key:
+        raise HTTPException(
+            status_code=500, 
+            detail="Server configuration error: Missing Supabase Admin Keys"
+        )
+    return create_client(supabase_url, supabase_service_key)
+
 
 router = APIRouter(
     prefix="/api",
@@ -43,33 +53,148 @@ def list_all_organizations(
     # Map store_id (int) to id (str) for frontend
     return [{"id": str(s.store_id), "name": s.name} for s in stores]
 
-@router.get("/admin/users", dependencies=[Depends(auth.require_role("admin"))])
+@router.get("/admin/users", dependencies=[Depends(auth.require_role("admin"))], response_model=List[schemas.UserResponse])
 def list_users(
     db: Session = Depends(get_db),
     ctx: auth.UserContext = Depends(auth.get_current_user)
 ):
-    """List all users in the organization (and their roles)"""
-    # Note: Since users are in Supabase, we can only list users who have interacted with our DB 
-    # OR we need to use Supabase Admin API to list all.
-    # For now, we'll list users present in user_roles table or distinct users from invoices/tables?
-    # Better approach for MVP: List users from UserRoles table + maybe query invoices for unique user_ids?
-    # Cleanest: Just query UserRoles joined with Roles.
+    """List all users with rich details from Supabase Auth"""
+    # 1. Fetch all users from Supabase Auth
+    try:
+        supabase = get_supabase_admin()
+        # Fetch up to 1000 users for now
+        response = supabase.auth.admin.list_users(page=1, per_page=1000)
+        auth_users = response if isinstance(response, list) else response.users # Handle different client versions
+    except Exception as e:
+        print(f"Error fetching Supabase users: {e}")
+        auth_users = []
+
+    # 2. Fetch all roles/store mappings from DB
+    user_roles = db.query(models.UserRole).all()
     
-    # Ideally, we should have a 'users' table sync, but we don't. 
-    # So we will return a list of users found in the UserRole table.
-    
-    user_roles = db.query(models.UserRole).filter(
-        models.UserRole.organization_id == ctx.org_id
-    ).all()
-    
-    # Group by user_id
-    users = {}
+    # 3. Fetch all stores to map IDs to names
+    all_stores = db.query(models.Store).all()
+    store_map = {str(s.store_id): s.name for s in all_stores}
+
+    # Group roles by user_id
+    # user_roles_map = { user_id: { roles: set(), store_ids: [] } }
+    user_roles_map = {}
     for ur in user_roles:
-        if ur.user_id not in users:
-            users[ur.user_id] = {"user_id": ur.user_id, "roles": []}
-        users[ur.user_id]["roles"].append(ur.role_id)
+        if ur.user_id not in user_roles_map:
+            user_roles_map[ur.user_id] = {"roles": set(), "store_ids": set()}
         
-    return list(users.values())
+        user_roles_map[ur.user_id]["roles"].add(ur.role_id)
+        user_roles_map[ur.user_id]["store_ids"].add(ur.organization_id)
+
+    # 4. Merge Data
+    result = []
+    for u in auth_users:
+        uid = u.id
+        
+        # Get DB Data
+        db_data = user_roles_map.get(uid, {"roles": [], "store_ids": []})
+        
+        # Format Stores
+        relevant_stores = []
+        for sid in db_data["store_ids"]:
+            if sid in store_map:
+                relevant_stores.append(schemas.StoreSchema(id=sid, name=store_map[sid]))
+            else:
+                relevant_stores.append(schemas.StoreSchema(id=sid, name="Unknown Store"))
+        
+        # Extract Metadata
+        meta = u.user_metadata or {}
+        
+        result.append(schemas.UserResponse(
+            id=uid,
+            email=u.email or "",
+            first_name=meta.get("first_name") or meta.get("firstName"),
+            last_name=meta.get("last_name") or meta.get("lastName"),
+            roles=list(db_data["roles"]),
+            stores=relevant_stores,
+            created_at=datetime.fromisoformat(u.created_at.replace('Z', '+00:00')) if u.created_at else None
+        ))
+        
+    return result
+
+@router.put("/admin/users/{user_id}", dependencies=[Depends(auth.require_role("admin"))])
+def update_user(
+    user_id: str,
+    user_data: schemas.UserUpdate,
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """Update user details and store/role assignments"""
+    supabase = get_supabase_admin()
+    
+    # 1. Update Supabase Auth (Email, Metadata)
+    updates = {}
+    if user_data.email:
+        updates["email"] = user_data.email
+    
+    meta_updates = {}
+    if user_data.first_name:
+        meta_updates["first_name"] = user_data.first_name
+    if user_data.last_name:
+        meta_updates["last_name"] = user_data.last_name
+        
+    if updates or meta_updates:
+        if meta_updates:
+            updates["user_metadata"] = meta_updates
+        try:
+            supabase.auth.admin.update_user_by_id(user_id, updates)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to update Supabase user: {e}")
+
+    # 2. Update Roles/Stores (if provided)
+    # Strategy: If target_org_ids is provided, existing roles are replaced.
+    if user_data.target_org_ids is not None:
+        # Validate Role (required if changing stores)
+        role_to_assign = user_data.role
+        if not role_to_assign:
+            # Try to infer role from existing (safe fallback: 'staff')
+            existing = db.query(models.UserRole).filter(models.UserRole.user_id == user_id).first()
+            role_to_assign = existing.role_id if existing else "staff"
+
+        # Wipe existing roles
+        db.query(models.UserRole).filter(models.UserRole.user_id == user_id).delete()
+        
+        # Create new roles
+        for org_id in user_data.target_org_ids:
+            new_role = models.UserRole(
+                user_id=user_id,
+                role_id=role_to_assign,
+                organization_id=org_id
+            )
+            db.add(new_role)
+        db.commit()
+    
+    return {"status": "success"}
+
+@router.delete("/admin/users/{user_id}", dependencies=[Depends(auth.require_role("admin"))])
+def delete_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """Delete a user from Keycloak/Supabase and DB"""
+    # Prevent deleting yourself
+    if user_id == ctx.user_id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+
+    supabase = get_supabase_admin()
+
+    # 1. Delete from Supabase
+    try:
+        supabase.auth.admin.delete_user(user_id)
+    except Exception as e:
+        print(f"Warning: Failed to delete from Supabase (might not exist): {e}")
+
+    # 2. Delete from DB (Roles)
+    db.query(models.UserRole).filter(models.UserRole.user_id == user_id).delete()
+    db.commit()
+
+    return {"status": "success"}
 
 @router.put("/admin/users/{user_id}/roles", dependencies=[Depends(auth.require_role("admin"))])
 def update_user_roles(

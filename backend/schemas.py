@@ -162,6 +162,22 @@ class StoreSchema(BaseModel):
         "populate_by_name": True
     }
 
+class UserUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = None
+    target_org_ids: Optional[List[str]] = None
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    roles: List[str] = []
+    stores: List[StoreSchema] = []
+    created_at: Optional[datetime] = None
+
 # Vendor Schemas
 class VendorBase(BaseModel):
     name: str

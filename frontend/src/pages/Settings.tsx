@@ -48,11 +48,30 @@ const userSchema = z.object({
     target_org_ids: z.array(z.string()).optional(),
 });
 
-type UserFormData = z.infer<typeof userSchema>;
+const editUserSchema = z.object({
+    email: z.string().email("Invalid email address"),
+    first_name: z.string().optional(),
+    last_name: z.string().optional(),
+    role: z.enum(["admin", "manager", "staff"]),
+    target_org_ids: z.array(z.string()).optional(),
+});
 
-interface UserRole {
-    user_id: string;
+type UserFormData = z.infer<typeof userSchema>;
+type EditUserFormData = z.infer<typeof editUserSchema>;
+
+interface StoreRef {
+    id: string;
+    name: string;
+}
+
+interface User {
+    id: string;
+    email: string;
+    first_name?: string;
+    last_name?: string;
     roles: string[];
+    stores: StoreRef[];
+    created_at?: string;
 }
 
 interface Organization {
@@ -70,9 +89,11 @@ export default function Settings() {
     const [isLoading, setIsLoading] = useState(false);
 
     // User Management State
-    const [users, setUsers] = useState<UserRole[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
     const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
+    const [isEditUserOpen, setIsEditUserOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState<User | null>(null);
     const [availableOrgs, setAvailableOrgs] = useState<Organization[]>([]);
 
     const {
@@ -91,9 +112,20 @@ export default function Settings() {
         reset: resetUser,
         setValue: setValueUser,
         formState: { errors: userErrors },
+        watch: watchUser
     } = useForm<UserFormData>({
         resolver: zodResolver(userSchema),
         defaultValues: { role: "staff" }
+    });
+
+    const {
+        register: registerEditUser,
+        handleSubmit: handleSubmitEditUser,
+        reset: resetEditUser,
+        setValue: setValueEditUser,
+        formState: { errors: editUserErrors },
+    } = useForm<EditUserFormData>({
+        resolver: zodResolver(editUserSchema),
     });
 
     // Fetch Users & Orgs (Admin Only)
@@ -137,24 +169,66 @@ export default function Settings() {
         }
     };
 
-    const handleRoleUpdate = async (userId: string, newRole: string) => {
+    const handleUpdateUser = async (data: EditUserFormData) => {
+        if (!editingUser) return;
+        setLoadingUsers(true);
         try {
             const token = await getToken();
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/admin/users/${userId}/roles`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/admin/users/${editingUser.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`
                 },
-                body: JSON.stringify({ roles: [newRole] }) // Single role enforcement for now
+                body: JSON.stringify(data)
             });
 
             if (res.ok) {
                 await fetchUsers();
+                setIsEditUserOpen(false);
+                setEditingUser(null);
+            } else {
+                const err = await res.json();
+                alert(`Failed to update user: ${err.detail || 'Unknown error'}`);
             }
         } catch (e) {
-            console.error("Failed to update role", e);
+            console.error("Error updating user", e);
+            alert("Error updating user");
+        } finally {
+            setLoadingUsers(false);
         }
+    };
+
+    const handleDeleteUser = async (userId: string) => {
+        if (!confirm("Are you sure you want to delete this user? This cannot be undone.")) return;
+
+        try {
+            const token = await getToken();
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/admin/users/${userId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (res.ok) {
+                await fetchUsers();
+            } else {
+                alert("Failed to delete user");
+            }
+        } catch (e) {
+            console.error("Error deleting user", e);
+        }
+    };
+
+    const openEditUser = (user: User) => {
+        setEditingUser(user);
+        resetEditUser({
+            email: user.email,
+            first_name: user.first_name || "",
+            last_name: user.last_name || "",
+            role: (user.roles[0] as "admin" | "manager" | "staff") || "staff",
+            target_org_ids: user.stores.map(s => s.id)
+        });
+        setIsEditUserOpen(true);
     };
 
     const handleAddUser = async (data: UserFormData) => {
@@ -534,62 +608,138 @@ export default function Settings() {
                                     </DialogContent>
                                 </Dialog>
                             </div>
+
+                            {/* Edit User Dialog */}
+                            <Dialog open={isEditUserOpen} onOpenChange={setIsEditUserOpen}>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Edit User</DialogTitle>
+                                        <DialogDescription>Update user details and access.</DialogDescription>
+                                    </DialogHeader>
+                                    <form onSubmit={handleSubmitEditUser(handleUpdateUser)} className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="edit-first-name">First Name</Label>
+                                                <Input id="edit-first-name" {...registerEditUser("first_name")} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="edit-last-name">Last Name</Label>
+                                                <Input id="edit-last-name" {...registerEditUser("last_name")} />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit-email">Email</Label>
+                                            <Input id="edit-email" type="email" {...registerEditUser("email")} />
+                                            {editUserErrors.email && <p className="text-sm text-destructive">{editUserErrors.email.message}</p>}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit-role">Role</Label>
+                                            <div className="flex gap-2">
+                                                {['admin', 'manager', 'staff'].map(role => (
+                                                    <label key={role} className="flex items-center gap-2 cursor-pointer border p-2 rounded hover:bg-muted">
+                                                        <input type="radio" value={role} {...registerEditUser("role")} />
+                                                        <span className="capitalize">{role}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Assigned Stores</Label>
+                                            <div className="border rounded-md p-3 space-y-2 max-h-[150px] overflow-y-auto">
+                                                {availableOrgs.map(org => (
+                                                    <label key={org.id} className="flex items-center gap-2 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            value={org.id}
+                                                            {...registerEditUser("target_org_ids")}
+                                                            className="rounded border-gray-300 text-primary focus:ring-primary"
+                                                        />
+                                                        <span className="text-sm">{org.name}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">Select stores this user can access.</p>
+                                        </div>
+                                        <DialogFooter>
+                                            <Button type="button" variant="outline" onClick={() => setIsEditUserOpen(false)}>Cancel</Button>
+                                            <Button type="submit" disabled={loadingUsers}>
+                                                {loadingUsers && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                                Save Changes
+                                            </Button>
+                                        </DialogFooter>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
                         </div>
 
                         <div className="border rounded-md">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>User ID</TableHead>
+                                        <TableHead>User</TableHead>
                                         <TableHead>Role</TableHead>
-                                        <TableHead className="w-[200px]">Actions</TableHead>
+                                        <TableHead>Stores</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {loadingUsers ? (
                                         <TableRow>
-                                            <TableCell colSpan={3} className="text-center py-8">
+                                            <TableCell colSpan={4} className="text-center py-8">
                                                 <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                                             </TableCell>
                                         </TableRow>
                                     ) : users.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                                            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                                                 No users found.
                                             </TableCell>
                                         </TableRow>
                                     ) : (
                                         users.map((u) => (
-                                            <TableRow key={u.user_id}>
+                                            <TableRow key={u.id}>
                                                 <TableCell className="font-medium">
-                                                    <div className="flex items-center gap-2">
-                                                        <Shield className="h-4 w-4 text-muted-foreground" />
-                                                        {u.user_id}
+                                                    <div className="flex flex-col">
+                                                        <span className="font-semibold text-gray-900">
+                                                            {u.first_name || ""} {u.last_name || ""}
+                                                        </span>
+                                                        <span className="text-sm text-gray-500">{u.email}</span>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <div className="flex gap-1 flex-wrap">
-                                                        {u.roles.map(r => (
-                                                            <span key={r} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                                {r}
+                                                    {u.roles.map(r => (
+                                                        <span key={r} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                                                            {r}
+                                                        </span>
+                                                    ))}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {u.stores && u.stores.length > 0 ? u.stores.map(s => (
+                                                            <span key={s.id} className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-700">
+                                                                {s.name}
                                                             </span>
-                                                        ))}
+                                                        )) : <span className="text-xs text-muted-foreground">None</span>}
                                                     </div>
                                                 </TableCell>
-                                                <TableCell>
-                                                    <Select
-                                                        defaultValue={u.roles[0] || 'staff'}
-                                                        onValueChange={(val) => handleRoleUpdate(u.user_id, val)}
-                                                    >
-                                                        <SelectTrigger className="w-[140px]">
-                                                            <SelectValue placeholder="Select role" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="admin">Admin</SelectItem>
-                                                            <SelectItem value="manager">Manager</SelectItem>
-                                                            <SelectItem value="staff">Staff</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
+                                                <TableCell className="text-right">
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => openEditUser(u)}
+                                                        >
+                                                            <Pencil className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="text-destructive hover:text-destructive"
+                                                            onClick={() => handleDeleteUser(u.id)}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))
