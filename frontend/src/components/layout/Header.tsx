@@ -25,8 +25,8 @@ export const Header = () => {
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl">
       <nav className="container flex h-16 items-center justify-between">
         <Link to="/" className="flex items-center gap-2 font-semibold text-lg">
-          <img src="/logo.png" alt="Cascadia Invoice Agent" className="h-8 w-auto rounded-lg" />
-          <span className="hidden sm:inline-block">Cascadia Invoice Agent</span>
+          <img src="/logo.png" alt="Cascadia Invoice Assistant" className="h-8 w-auto rounded-lg" />
+          <span className="hidden sm:inline-block">Cascadia Invoice Assistant</span>
         </Link>
 
         {/* Desktop Navigation */}

@@ -8,8 +8,8 @@ export const Footer = () => {
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <img src="/logo-footer.png" alt="Cascadia Invoice Agent" className="h-8 w-auto" />
-              <span className="font-semibold text-lg">Cascadia Invoice Agent</span>
+              <img src="/logo-footer.png" alt="Cascadia Invoice Assistant" className="h-8 w-auto" />
+              <span className="font-semibold text-lg">Cascadia Invoice Assistant</span>
             </div>
             <p className="text-sm text-muted-foreground">
               Automate invoice processing with AI. Save hours every week.
@@ -84,7 +84,7 @@ export const Footer = () => {
         </div>
 
         <div className="mt-12 pt-8 border-t border-border/40 text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} Cascadia Invoice Agent. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Cascadia Invoice Assistant. All rights reserved.</p>
         </div>
       </div>
     </footer>

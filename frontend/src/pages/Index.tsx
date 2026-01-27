@@ -53,7 +53,7 @@ const Index = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 flex flex-col items-center">
           <div className="mb-4">
-            <img src="/logo.png" alt="Cascadia Invoice Agent" className="h-12 w-auto rounded-lg" />
+            <img src="/logo.png" alt="Cascadia Invoice Assistant" className="h-12 w-auto rounded-lg" />
           </div>
           <CardTitle className="text-2xl font-bold text-center">Sign in</CardTitle>
           <CardDescription className="text-center">

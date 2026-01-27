@@ -26,9 +26,9 @@ export function AppHeader() {
             <div className="container mx-auto px-4 h-16 flex items-center justify-between max-w-7xl">
                 <div className="flex items-center gap-8">
                     <div className="flex items-center gap-2">
-                        <img src="/logo.png" alt="Cascadia Invoice Agent" className="h-8 w-auto rounded-lg" />
+                        <img src="/logo.png" alt="Cascadia Invoice Assistant" className="h-8 w-auto rounded-lg" />
                         <h2 className="text-xl font-bold text-foreground">
-                            Cascadia Invoice Agent
+                            Cascadia Invoice Assistant
                         </h2>
                     </div>
 

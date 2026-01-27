@@ -26,9 +26,9 @@ export function AppSidebar() {
         <aside className="w-64 border-r bg-card hidden md:flex flex-col h-screen sticky top-0">
             <div className="p-6 border-b flex flex-col gap-4">
                 <div className="flex items-center gap-2 px-2">
-                    <img src="/logo.png" alt="Cascadia Invoice Agent" className="h-8 w-auto rounded-lg" />
+                    <img src="/logo.png" alt="Cascadia Invoice Assistant" className="h-8 w-auto rounded-lg" />
                     <h2 className="text-lg font-bold text-foreground leading-tight">
-                        Cascadia Invoice Agent
+                        Cascadia Invoice Assistant
                     </h2>
                 </div>
             </div>
