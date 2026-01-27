@@ -5,6 +5,7 @@ import os
 import traceback
 import models, database
 from routers import invoices, vendors, gl_categories, debug, issues, admin, auth_router
+import auth
 
 models.Base.metadata.create_all(bind=database.engine)
 
@@ -62,7 +63,6 @@ app.include_router(auth_router.router)
 @app.get("/api/health")
 def health_check():
     from database import SQLALCHEMY_DATABASE_URL
-    import auth
     db_type = "postgres" if "postgres" in SQLALCHEMY_DATABASE_URL else "sqlite"
     
     return {
@@ -78,7 +78,6 @@ def health_check():
 @app.get("/whoami")
 @app.get("/api/whoami")
 async def whoami(ctx: auth.UserContext = Depends(auth.get_current_user)):
-    import auth
     return {
         "user_id": ctx.user_id if ctx else None,
         "email": ctx.email if ctx else None,
