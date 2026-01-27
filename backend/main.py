@@ -59,6 +59,7 @@ app.include_router(auth_router.router)
 
 @app.get("/")
 @app.get("/health")
+@app.get("/api/health")
 def health_check():
     from database import SQLALCHEMY_DATABASE_URL
     import auth
@@ -75,6 +76,7 @@ def health_check():
     }
 
 @app.get("/whoami")
+@app.get("/api/whoami")
 async def whoami(ctx: auth.UserContext = Depends(auth.get_current_user)):
     import auth
     return {
