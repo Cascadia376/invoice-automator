@@ -45,6 +45,7 @@ type CategoryFormData = z.infer<typeof categorySchema>;
 const userSchema = z.object({
     email: z.string().email("Invalid email address"),
     role: z.enum(["admin", "manager", "staff"]),
+    target_org_ids: z.array(z.string()).optional(),
 });
 
 type UserFormData = z.infer<typeof userSchema>;
@@ -52,6 +53,11 @@ type UserFormData = z.infer<typeof userSchema>;
 interface UserRole {
     user_id: string;
     roles: string[];
+}
+
+interface Organization {
+    id: string;
+    name: string;
 }
 
 export default function Settings() {
@@ -67,6 +73,7 @@ export default function Settings() {
     const [users, setUsers] = useState<UserRole[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
     const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
+    const [availableOrgs, setAvailableOrgs] = useState<Organization[]>([]);
 
     const {
         register,
@@ -89,12 +96,28 @@ export default function Settings() {
         defaultValues: { role: "staff" }
     });
 
-    // Fetch Users (Admin Only)
+    // Fetch Users & Orgs (Admin Only)
     useEffect(() => {
         if (isAdmin) {
             fetchUsers();
+            fetchOrgs();
         }
     }, [isAdmin]);
+
+    const fetchOrgs = async () => {
+        try {
+            const token = await getToken();
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/admin/organizations`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setAvailableOrgs(data);
+            }
+        } catch (e) {
+            console.error("Failed to fetch organizations", e);
+        }
+    };
 
     const fetchUsers = async () => {
         setLoadingUsers(true);
@@ -471,6 +494,31 @@ export default function Settings() {
                                             </div>
                                             {userErrors.role && <p className="text-sm text-destructive">{userErrors.role.message}</p>}
                                         </div>
+
+                                        <div className="space-y-2">
+                                            <Label>Assign to Stores (Optional)</Label>
+                                            <div className="border rounded-md p-3 space-y-2 max-h-[150px] overflow-y-auto">
+                                                {availableOrgs.length === 0 ? (
+                                                    <p className="text-sm text-muted-foreground">No other stores available.</p>
+                                                ) : (
+                                                    availableOrgs.map(org => (
+                                                        <label key={org.id} className="flex items-center gap-2 cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                value={org.id}
+                                                                {...registerUser("target_org_ids")}
+                                                                className="rounded border-gray-300 text-primary focus:ring-primary"
+                                                            />
+                                                            <span className="text-sm">{org.name}</span>
+                                                        </label>
+                                                    ))
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                If none selected, defaults to current store only.
+                                            </p>
+                                        </div>
+
                                         <DialogFooter>
                                             <Button type="button" variant="outline" onClick={() => setIsUserDialogOpen(false)}>
                                                 Cancel

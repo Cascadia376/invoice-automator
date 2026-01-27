@@ -18,6 +18,7 @@ class RoleUpdate(BaseModel):
 class UserInvite(BaseModel):
     email: str
     role: str
+    target_org_ids: List[str] = []
 
 @router.get("/users/me/roles")
 def get_my_roles(
@@ -31,6 +32,30 @@ def get_my_roles(
     ).all()
     
     return {"roles": [ur.role_id for ur in user_roles]}
+
+@router.get("/admin/organizations", dependencies=[Depends(auth.require_role("admin"))])
+def list_my_admin_organizations(
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """List organizations where the current user is an admin"""
+    # 1. Get all admin roles for this user
+    admin_roles = db.query(models.UserRole).filter(
+        models.UserRole.user_id == ctx.user_id,
+        models.UserRole.role_id == "admin"
+    ).all()
+    
+    org_ids = [role.organization_id for role in admin_roles]
+    
+    # 2. Fetch Organization details
+    if not org_ids:
+        return []
+        
+    orgs = db.query(models.Organization).filter(
+        models.Organization.id.in_(org_ids)
+    ).all()
+    
+    return orgs
 
 @router.get("/admin/users", dependencies=[Depends(auth.require_role("admin"))])
 def list_users(
@@ -124,27 +149,51 @@ def invite_user(
         # Only if the error suggests they exist, but for now just fail safely
         raise HTTPException(status_code=400, detail=f"Failed to invite user: {str(e)}")
 
-    # 3. Add Role
-    # Check if role exists for this user in this org
-    existing_role = db.query(models.UserRole).filter(
-        models.UserRole.user_id == user.id,
-        models.UserRole.organization_id == ctx.org_id
-    ).first()
+        raise HTTPException(status_code=400, detail=f"Failed to invite user: {str(e)}")
+
+    # 3. Add Roles for each Target Org
+    # If target_org_ids is empty, default to current org
+    target_orgs = invite_data.target_org_ids if invite_data.target_org_ids else [ctx.org_id]
     
-    if existing_role:
-        existing_role.role_id = invite_data.role
-    else:
-        new_role = models.UserRole(
-            user_id=user.id,
-            role_id=invite_data.role,
-            organization_id=ctx.org_id
-        )
-        db.add(new_role)
+    # Validate that the requester is actually an admin of all these orgs
+    # (Security check)
+    requester_admin_roles = db.query(models.UserRole).filter(
+        models.UserRole.user_id == ctx.user_id,
+        models.UserRole.role_id == "admin",
+        models.UserRole.organization_id.in_(target_orgs)
+    ).all()
+    
+    allowed_org_ids = {r.organization_id for r in requester_admin_roles}
+    
+    results = []
+    
+    for org_id in target_orgs:
+        if org_id not in allowed_org_ids:
+            print(f"WARNING: User {ctx.user_id} tried to invite to {org_id} but is not admin.")
+            continue
+            
+        # Check if role exists for this user in this org
+        existing_role = db.query(models.UserRole).filter(
+            models.UserRole.user_id == user.id,
+            models.UserRole.organization_id == org_id
+        ).first()
+        
+        if existing_role:
+            existing_role.role_id = invite_data.role
+            results.append(f"Updated {org_id}")
+        else:
+            new_role = models.UserRole(
+                user_id=user.id,
+                role_id=invite_data.role,
+                organization_id=org_id
+            )
+            db.add(new_role)
+            results.append(f"Added to {org_id}")
     
     db.commit()
     
     return {
         "status": "success", 
-        "message": f"User {invite_data.email} invited and assigned role {invite_data.role}", 
+        "message": f"User invited. Actions: {', '.join(results)}", 
         "user": {"id": user.id, "email": user.email}
     }
