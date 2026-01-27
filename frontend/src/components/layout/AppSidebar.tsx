@@ -19,7 +19,7 @@ export function AppSidebar() {
 
     const handleLogout = async () => {
         await signOut();
-        window.location.href = "/";
+        navigate("/", { replace: true });
     };
 
     return (
