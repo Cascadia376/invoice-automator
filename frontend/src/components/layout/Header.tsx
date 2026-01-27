@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { FileText, Menu, X, LogOut } from "lucide-react";
+import { FileText, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 
 export const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { session, user, signOut } = useAuth();
+  const { session, user } = useAuth();
 
   const handleSignIn = async () => {
     const email = window.prompt("Enter your email to sign in with Supabase");
@@ -54,9 +54,7 @@ export const Header = () => {
                 <span className="text-sm text-muted-foreground hidden sm:inline-block">
                   {user?.email || "Signed in"}
                 </span>
-                <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sign out">
-                  <LogOut className="h-4 w-4" />
-                </Button>
+
               </div>
             </>
           ) : (
@@ -108,11 +106,7 @@ export const Header = () => {
               FAQ
             </a>
             <div className="pt-3 space-y-2">
-              {session ? (
-                <Button variant="ghost" className="w-full" onClick={signOut}>
-                  Sign Out
-                </Button>
-              ) : (
+              {!session && (
                 <>
                   <Button variant="ghost" className="w-full" onClick={handleSignIn}>
                     Sign In
@@ -122,8 +116,8 @@ export const Header = () => {
               )}
             </div>
           </div>
-        </div>
+        </div >
       )}
-    </header>
+    </header >
   );
 };
