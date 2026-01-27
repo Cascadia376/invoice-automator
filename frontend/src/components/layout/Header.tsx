@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { FileText, Menu, X } from "lucide-react";
+import { FileText, Menu, X, Settings } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -54,9 +54,14 @@ export const Header = () => {
                 <span className="text-sm text-muted-foreground hidden sm:inline-block">
                   {user?.email || "Signed in"}
                 </span>
-                <Button variant="outline" size="sm" onClick={() => signOut()}>
+                <Button variant="ghost" size="sm" className="hidden md:inline-flex" onClick={() => signOut()}>
                   Sign Out
                 </Button>
+                <Link to="/settings">
+                  <Button variant="ghost" size="icon" className="hidden md:inline-flex">
+                    <Settings className="h-5 w-5" />
+                  </Button>
+                </Link>
               </div>
             </>
           ) : (
