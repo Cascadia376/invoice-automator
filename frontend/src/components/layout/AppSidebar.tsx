@@ -1,9 +1,13 @@
 import { Home, Upload, FileText, Settings, LogOut, Building2, BarChart3 } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/AuthContext";
 
 export function AppSidebar() {
+    const { signOut } = useAuth();
+    const navigate = useNavigate();
+
     const navItems = [
         { icon: Home, label: "Dashboard", href: "/dashboard" },
         { icon: Upload, label: "Upload", href: "/upload" },
@@ -12,6 +16,11 @@ export function AppSidebar() {
         { icon: Building2, label: "Vendors", href: "/vendors" },
         { icon: Settings, label: "Settings", href: "/settings" },
     ];
+
+    const handleLogout = async () => {
+        await signOut();
+        navigate("/", { replace: true });
+    };
 
     return (
         <aside className="w-64 border-r bg-card hidden md:flex flex-col h-screen sticky top-0">
@@ -42,7 +51,11 @@ export function AppSidebar() {
             </nav>
 
             <div className="p-4 border-t">
-                <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive">
+                <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive"
+                    onClick={handleLogout}
+                >
                     <LogOut className="h-5 w-5" />
                     Sign Out
                 </Button>
