@@ -91,6 +91,20 @@ export default function Settings() {
     // User Management State
     const [users, setUsers] = useState<User[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
+    const [testResult, setTestResult] = useState<any>(null);
+
+    const testAdminConnection = async () => {
+        try {
+            const token = await getToken();
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/admin/connection-status`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await res.json();
+            setTestResult(data);
+        } catch (e: any) {
+            setTestResult({ error: e.toString() });
+        }
+    };
     const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
     const [isEditUserOpen, setIsEditUserOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -512,7 +526,22 @@ export default function Settings() {
 
                 {isAdmin && (
                     <TabsContent value="team" className="space-y-4 mt-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex justify-between items-center bg-muted/50 p-4 rounded-lg border">
+                            <div>
+                                <h3 className="font-semibold">Troubleshoot Connection</h3>
+                                <p className="text-xs text-muted-foreground">If users are not loading, check the backend status.</p>
+                            </div>
+                            <Button variant="outline" size="sm" onClick={testAdminConnection}>
+                                Test Admin Connection
+                            </Button>
+                        </div>
+                        {testResult && (
+                            <div className="bg-slate-950 text-slate-50 p-4 rounded-md font-mono text-xs overflow-auto max-h-40">
+                                <pre>{JSON.stringify(testResult, null, 2)}</pre>
+                            </div>
+                        )}
+
+                        <div className="flex justify-between items-center">
                             <div>
                                 <h4 className="text-base font-medium">Team Management</h4>
                                 <p className="text-sm text-muted-foreground">

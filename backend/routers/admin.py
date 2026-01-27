@@ -302,3 +302,39 @@ def invite_user(
         "message": f"User invited. Actions: {', '.join(results)}", 
         "user": {"id": user.id, "email": user.email}
     }
+@router.get("/admin/connection-status", dependencies=[Depends(auth.require_role("admin"))])
+def check_connection(
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """
+    Diagnostic endpoint to verify Supabase Admin connectivity from the backend.
+    """
+    supabase_url = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL")
+    supabase_service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    
+    status_report = {
+        "env": {
+            "SUPABASE_URL": "Set" if supabase_url else "MISSING",
+            "SUPABASE_SERVICE_ROLE_KEY": "Set" if supabase_service_key else "MISSING",
+        },
+        "connection": "Unknown",
+        "user_count": -1,
+        "error": None
+    }
+
+    try:
+        supabase = get_supabase_admin()
+        status_report["connection"] = "Client Initialized"
+        
+        # Try specific fetch
+        response = supabase.auth.admin.list_users(page=1, per_page=5)
+        users = response if isinstance(response, list) else response.users
+        
+        status_report["connection"] = "Success"
+        status_report["user_count"] = len(users)
+        
+    except Exception as e:
+        status_report["connection"] = "Failed"
+        status_report["error"] = str(e)
+        
+    return status_report
