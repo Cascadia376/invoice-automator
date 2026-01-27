@@ -5,6 +5,7 @@ import models, schemas, auth
 from database import get_db
 from pydantic import BaseModel
 import os
+from supabase import create_client, Client
 
 def get_supabase_admin() -> Client:
     supabase_url = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL")
