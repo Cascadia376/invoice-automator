@@ -140,3 +140,36 @@ def execute_raw_sql(
     except Exception as e:
         import traceback
         return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
+
+@router.post("/api/debug/bootstrap-admin")
+def bootstrap_admin_role(
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """
+    Emergency endpoint to promote the CURRENT user to admin.
+    Does NOT require admin role (obviously).
+    """
+    try:
+        # Check if already has admin role
+        existing = db.query(models.UserRole).filter(
+            models.UserRole.user_id == ctx.user_id,
+            models.UserRole.role_id == "admin",
+            models.UserRole.organization_id == ctx.org_id
+        ).first()
+
+        if existing:
+            return {"status": "success", "message": "User is already admin", "user_id": ctx.user_id}
+
+        # Insert admin role
+        new_role = models.UserRole(
+            user_id=ctx.user_id,
+            role_id="admin",
+            organization_id=ctx.org_id
+        )
+        db.add(new_role)
+        db.commit()
+        return {"status": "success", "message": "User promoted to admin", "user_id": ctx.user_id}
+    except Exception as e:
+        import traceback
+        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
