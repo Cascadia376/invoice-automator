@@ -87,12 +87,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = useCallback(async () => {
     if (disableAuth) return;
     try {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: "local" });
     } catch (e) {
       console.error("Error signing out:", e);
     }
 
-    // Manually clear Supabase tokens from localStorage to prevent "zombie" sessions
     // Manually clear Supabase tokens from localStorage to prevent "zombie" sessions
     Object.keys(localStorage).forEach((key) => {
       if (key.startsWith("sb-")) {
