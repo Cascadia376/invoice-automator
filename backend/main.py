@@ -77,10 +77,28 @@ def health_check():
 
 @app.get("/whoami")
 @app.get("/api/whoami")
-async def whoami(ctx: auth.UserContext = Depends(auth.get_current_user)):
+async def whoami(claims: Optional[dict] = Depends(auth.get_supabase_user)):
+    """
+    Returns the current authentication status and user information.
+    """
+    if not claims:
+        return {
+            "authenticated": False,
+            "user_id": None,
+            "email": None,
+            "auth_required": auth.AUTH_REQUIRED
+        }
+    
+    # Filter safe claims (remove internal JWT noise)
+    safe_claims = {
+        k: v for k, v in claims.items() 
+        if k not in ["nonce", "at_hash", "c_hash", "sid", "amr"]
+    }
+    
     return {
-        "user_id": ctx.user_id if ctx else None,
-        "email": ctx.email if ctx else None,
-        "authenticated": ctx is not None,
-        "auth_required": auth.AUTH_REQUIRED
+        "authenticated": True,
+        "user_id": claims.get("sub"),
+        "email": claims.get("email"),
+        "auth_required": auth.AUTH_REQUIRED,
+        "claims": safe_claims
     }
