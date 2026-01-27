@@ -164,6 +164,7 @@ export default function Settings() {
             }
         } catch (e) {
             console.error("Failed to fetch users", e);
+            alert("Failed to load users. Check console for details.");
         } finally {
             setLoadingUsers(false);
         }

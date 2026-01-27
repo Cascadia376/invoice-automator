@@ -23,4 +23,6 @@ services:
         value: authenticated
       - key: SUPABASE_URL
         sync: false # Required for fetching RS256 signing keys automatically
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false # Required for admin operations (inviting users)
     autoDeploy: true

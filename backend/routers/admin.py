@@ -67,8 +67,11 @@ def list_users(
         response = supabase.auth.admin.list_users(page=1, per_page=1000)
         auth_users = response if isinstance(response, list) else response.users # Handle different client versions
     except Exception as e:
-        print(f"Error fetching Supabase users: {e}")
-        auth_users = []
+        # Propagate error so frontend sees it
+        raise HTTPException(
+            status_code=500,
+            detail=f"Supabase Admin API Error: {str(e)}"
+        )
 
     # 2. Fetch all roles/store mappings from DB
     user_roles = db.query(models.UserRole).all()
