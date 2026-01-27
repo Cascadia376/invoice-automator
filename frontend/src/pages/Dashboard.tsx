@@ -319,34 +319,7 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-6">
-            {/* DEBUG / TROUBLESHOOTING PANEL */}
-            <div className="bg-slate-900 text-slate-50 p-4 rounded-lg border border-slate-700 shadow-sm mb-6">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div className="text-xs font-mono space-y-1">
-                        <p className="font-bold text-yellow-400 uppercase tracking-wider">Debug Info</p>
-                        <p>User ID: <span className="opacity-70">{user?.id}</span></p>
-                        <p>Org ID: <span className="opacity-70">{orgId}</span></p>
-                        <p>Roles: <span className="opacity-70">[{roles.join(", ")}]</span></p>
-                    </div>
-                    <div className="flex gap-2">
-                        {!roles.includes('admin') && (
-                            <button
-                                onClick={handleBootstrapAdmin}
-                                disabled={troubleshootLoading}
-                                className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-xs font-bold transition-colors disabled:opacity-50"
-                            >
-                                {troubleshootLoading ? "Promoting..." : "FIX: GRANT ME ADMIN"}
-                            </button>
-                        )}
-                        <button
-                            onClick={handleHardLogout}
-                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-xs font-bold transition-colors"
-                        >
-                            HARD LOGOUT (CLEAR CACHE)
-                        </button>
-                    </div>
-                </div>
-            </div>
+
 
             <div className="flex flex-wrap justify-between items-center gap-4">
                 <p className="text-3xl font-black leading-tight tracking-[-0.033em] text-gray-900">Dashboard</p>
