@@ -86,13 +86,14 @@ class Template(Base):
     content = Column(String) # YAML content
     created_at = Column(DateTime, default=datetime.utcnow)
 
-class Organization(Base):
-    __tablename__ = "organizations"
+class Store(Base):
+    __tablename__ = "store"
 
-    id = Column(String, primary_key=True, index=True)
+    store_id = Column(Integer, primary_key=True, index=True)
     name = Column(String)
-    subscription_status = Column(String, default="free") # free, active, past_due
-    created_at = Column(DateTime, default=datetime.utcnow)
+    organization_id = Column(String, nullable=True)
+    access_code = Column(String, nullable=True)
+    status = Column(String, default="active")
 
 class Vendor(Base):
     """Vendor profile with learned patterns"""

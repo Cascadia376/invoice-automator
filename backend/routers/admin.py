@@ -33,14 +33,15 @@ def get_my_roles(
     
     return {"roles": [ur.role_id for ur in user_roles]}
 
-@router.get("/admin/organizations", dependencies=[Depends(auth.require_role("admin"))])
+@router.get("/admin/organizations", dependencies=[Depends(auth.require_role("admin"))], response_model=List[schemas.StoreSchema])
 def list_all_organizations(
     db: Session = Depends(get_db),
     ctx: auth.UserContext = Depends(auth.get_current_user)
 ):
-    """List ALL organizations in the system (Super Admin view requested)"""
-    orgs = db.query(models.Organization).all()
-    return orgs
+    """List ALL organizations (Stores) in the system"""
+    stores = db.query(models.Store).all()
+    # Map store_id (int) to id (str) for frontend
+    return [{"id": str(s.store_id), "name": s.name} for s in stores]
 
 @router.get("/admin/users", dependencies=[Depends(auth.require_role("admin"))])
 def list_users(

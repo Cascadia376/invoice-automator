@@ -153,21 +153,13 @@ class GLCategory(GLCategoryBase):
         "alias_generator": to_camel
     }
 
-class OrganizationBase(BaseModel):
-    name: str
-    subscription_status: str = "free"
-
-class OrganizationCreate(OrganizationBase):
-    pass
-
-class Organization(OrganizationBase):
+class StoreSchema(BaseModel):
     id: str
-    created_at: datetime
-
+    name: str
+    
     model_config = {
         "from_attributes": True,
-        "populate_by_name": True,
-        "alias_generator": to_camel
+        "populate_by_name": True
     }
 
 # Vendor Schemas
