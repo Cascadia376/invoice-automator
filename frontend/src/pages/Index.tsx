@@ -19,8 +19,10 @@ const Index = () => {
   const { session, loading: authLoading } = useAuth();
 
   useEffect(() => {
+    // Only redirect if we have a definitive session and are NOT currently loading
     if (!authLoading && session) {
-      navigate("/dashboard");
+      console.log("[Index] Valid session detected, redirecting to dashboard");
+      navigate("/dashboard", { replace: true });
     }
   }, [session, authLoading, navigate]);
 

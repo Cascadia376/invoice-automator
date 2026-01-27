@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 
 export const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { session, user } = useAuth();
+  const { session, user, signOut } = useAuth();
 
   const handleSignIn = async () => {
     const email = window.prompt("Enter your email to sign in with Supabase");
@@ -54,7 +54,9 @@ export const Header = () => {
                 <span className="text-sm text-muted-foreground hidden sm:inline-block">
                   {user?.email || "Signed in"}
                 </span>
-
+                <Button variant="outline" size="sm" onClick={() => signOut()}>
+                  Sign Out
+                </Button>
               </div>
             </>
           ) : (
@@ -106,7 +108,11 @@ export const Header = () => {
               FAQ
             </a>
             <div className="pt-3 space-y-2">
-              {!session && (
+              {session ? (
+                <Button variant="outline" className="w-full" onClick={() => { signOut(); setMobileMenuOpen(false); }}>
+                  Sign Out
+                </Button>
+              ) : (
                 <>
                   <Button variant="ghost" className="w-full" onClick={handleSignIn}>
                     Sign In

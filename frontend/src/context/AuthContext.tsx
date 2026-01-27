@@ -86,25 +86,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = useCallback(async () => {
     if (disableAuth) return;
+
+    console.log("[AuthDebug] Initiating Sign Out");
+    setLoading(true);
+
     try {
-      await supabase.auth.signOut({ scope: "local" });
+      // Use global scope to ensure server-side session is also invalidated
+      const { error } = await supabase.auth.signOut({ scope: "global" });
+      if (error) console.error("Supabase signOut error:", error);
     } catch (e) {
       console.error("Error signing out:", e);
     }
 
-    // Manually clear Supabase tokens from localStorage to prevent "zombie" sessions
+    // Force clear all auth-related storage
     Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith("sb-")) {
+      if (key.startsWith("sb-") || key.includes("supabase")) {
         localStorage.removeItem(key);
       }
     });
-
-    // Also clear session storage just in case
     sessionStorage.clear();
 
+    // Reset local state
     setSession(null);
     setUser(null);
     setRoles([]);
+    setLoading(false);
+
+    // Hard redirect to root to reset entire React state and break redirect loops
+    window.location.href = "/";
   }, [disableAuth]);
 
   return (
