@@ -187,6 +187,7 @@ export default function Settings() {
         }
     };
 
+
     // GL Functions
     const onSubmit = async (data: CategoryFormData) => {
         setIsLoading(true);
@@ -443,39 +444,40 @@ export default function Settings() {
                                     Manage user roles and permissions.
                                 </p>
                             </div>
-                            <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
-                                <DialogTrigger asChild>
-                                    <Button onClick={() => { resetUser(); setIsUserDialogOpen(true); }}>
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        Add User
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                    <DialogHeader>
-                                        <DialogTitle>Add User</DialogTitle>
-                                        <DialogDescription>
-                                            Invite a new user to the organization.
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <form onSubmit={handleSubmitUser(handleAddUser)} className="space-y-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="email">Email Address</Label>
-                                            <Input id="email" type="email" placeholder="user@example.com" {...registerUser("email")} />
-                                            {userErrors.email && <p className="text-sm text-destructive">{userErrors.email.message}</p>}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="role">Role</Label>
-                                            <Select onValueChange={(val: "admin" | "manager" | "staff") => setValueUser("role", val)} defaultValue="staff">
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select a role" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="admin">Admin</SelectItem>
-                                                    <SelectItem value="manager">Manager</SelectItem>
-                                                    <SelectItem value="staff">Staff</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                            {/* Note: Select interaction with react-hook-form can be tricky without Controller, but simple default works for now if we bind manually or use Controller. 
+                            <div className="flex gap-2">
+                                <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button onClick={() => { resetUser(); setIsUserDialogOpen(true); }}>
+                                            <Plus className="h-4 w-4 mr-2" />
+                                            Add User
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Add User</DialogTitle>
+                                            <DialogDescription>
+                                                Invite a new user to the organization.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <form onSubmit={handleSubmitUser(handleAddUser)} className="space-y-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="email">Email Address</Label>
+                                                <Input id="email" type="email" placeholder="user@example.com" {...registerUser("email")} />
+                                                {userErrors.email && <p className="text-sm text-destructive">{userErrors.email.message}</p>}
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="role">Role</Label>
+                                                <Select onValueChange={(val: "admin" | "manager" | "staff") => setValueUser("role", val)} defaultValue="staff">
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select a role" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="admin">Admin</SelectItem>
+                                                        <SelectItem value="manager">Manager</SelectItem>
+                                                        <SelectItem value="staff">Staff</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                {/* Note: Select interaction with react-hook-form can be tricky without Controller, but simple default works for now if we bind manually or use Controller. 
                                                 Let's keep it simple: Use native select or proper Controller if this was critical. 
                                                 Actually, let's fix the Select binding properly using a hidden input or just native select for speed/robustness? 
                                                 Better: Re-use the pattern or just use native select for the form?
@@ -484,53 +486,54 @@ export default function Settings() {
                                                 Let's switch to native <select> for "role" inside the form to avoid complex controller setup in this quick edit, 
                                                 OR just use the `setValue` from `useForm` which is available.
                                             */}
-                                            <div className="flex gap-2">
-                                                {['admin', 'manager', 'staff'].map(role => (
-                                                    <label key={role} className="flex items-center gap-2 cursor-pointer border p-2 rounded hover:bg-muted">
-                                                        <input type="radio" value={role} {...registerUser("role")} />
-                                                        <span className="capitalize">{role}</span>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                            {userErrors.role && <p className="text-sm text-destructive">{userErrors.role.message}</p>}
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label>Assign to Stores (Optional)</Label>
-                                            <div className="border rounded-md p-3 space-y-2 max-h-[150px] overflow-y-auto">
-                                                {availableOrgs.length === 0 ? (
-                                                    <p className="text-sm text-muted-foreground">No other stores available.</p>
-                                                ) : (
-                                                    availableOrgs.map(org => (
-                                                        <label key={org.id} className="flex items-center gap-2 cursor-pointer">
-                                                            <input
-                                                                type="checkbox"
-                                                                value={org.id}
-                                                                {...registerUser("target_org_ids")}
-                                                                className="rounded border-gray-300 text-primary focus:ring-primary"
-                                                            />
-                                                            <span className="text-sm">{org.name}</span>
+                                                <div className="flex gap-2">
+                                                    {['admin', 'manager', 'staff'].map(role => (
+                                                        <label key={role} className="flex items-center gap-2 cursor-pointer border p-2 rounded hover:bg-muted">
+                                                            <input type="radio" value={role} {...registerUser("role")} />
+                                                            <span className="capitalize">{role}</span>
                                                         </label>
-                                                    ))
-                                                )}
+                                                    ))}
+                                                </div>
+                                                {userErrors.role && <p className="text-sm text-destructive">{userErrors.role.message}</p>}
                                             </div>
-                                            <p className="text-xs text-muted-foreground">
-                                                If none selected, defaults to current store only.
-                                            </p>
-                                        </div>
 
-                                        <DialogFooter>
-                                            <Button type="button" variant="outline" onClick={() => setIsUserDialogOpen(false)}>
-                                                Cancel
-                                            </Button>
-                                            <Button type="submit" disabled={loadingUsers}>
-                                                {loadingUsers && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                                Send Invite
-                                            </Button>
-                                        </DialogFooter>
-                                    </form>
-                                </DialogContent>
-                            </Dialog>
+                                            <div className="space-y-2">
+                                                <Label>Assign to Stores (Optional)</Label>
+                                                <div className="border rounded-md p-3 space-y-2 max-h-[150px] overflow-y-auto">
+                                                    {availableOrgs.length === 0 ? (
+                                                        <p className="text-sm text-muted-foreground">No other stores available.</p>
+                                                    ) : (
+                                                        availableOrgs.map(org => (
+                                                            <label key={org.id} className="flex items-center gap-2 cursor-pointer">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    value={org.id}
+                                                                    {...registerUser("target_org_ids")}
+                                                                    className="rounded border-gray-300 text-primary focus:ring-primary"
+                                                                />
+                                                                <span className="text-sm">{org.name}</span>
+                                                            </label>
+                                                        ))
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    If none selected, defaults to current store only.
+                                                </p>
+                                            </div>
+
+                                            <DialogFooter>
+                                                <Button type="button" variant="outline" onClick={() => setIsUserDialogOpen(false)}>
+                                                    Cancel
+                                                </Button>
+                                                <Button type="submit" disabled={loadingUsers}>
+                                                    {loadingUsers && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                                    Send Invite
+                                                </Button>
+                                            </DialogFooter>
+                                        </form>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
                         </div>
 
                         <div className="border rounded-md">

@@ -34,27 +34,12 @@ def get_my_roles(
     return {"roles": [ur.role_id for ur in user_roles]}
 
 @router.get("/admin/organizations", dependencies=[Depends(auth.require_role("admin"))])
-def list_my_admin_organizations(
+def list_all_organizations(
     db: Session = Depends(get_db),
     ctx: auth.UserContext = Depends(auth.get_current_user)
 ):
-    """List organizations where the current user is an admin"""
-    # 1. Get all admin roles for this user
-    admin_roles = db.query(models.UserRole).filter(
-        models.UserRole.user_id == ctx.user_id,
-        models.UserRole.role_id == "admin"
-    ).all()
-    
-    org_ids = [role.organization_id for role in admin_roles]
-    
-    # 2. Fetch Organization details
-    if not org_ids:
-        return []
-        
-    orgs = db.query(models.Organization).filter(
-        models.Organization.id.in_(org_ids)
-    ).all()
-    
+    """List ALL organizations in the system (Super Admin view requested)"""
+    orgs = db.query(models.Organization).all()
     return orgs
 
 @router.get("/admin/users", dependencies=[Depends(auth.require_role("admin"))])
@@ -155,23 +140,13 @@ def invite_user(
     # If target_org_ids is empty, default to current org
     target_orgs = invite_data.target_org_ids if invite_data.target_org_ids else [ctx.org_id]
     
-    # Validate that the requester is actually an admin of all these orgs
-    # (Security check)
-    requester_admin_roles = db.query(models.UserRole).filter(
-        models.UserRole.user_id == ctx.user_id,
-        models.UserRole.role_id == "admin",
-        models.UserRole.organization_id.in_(target_orgs)
-    ).all()
-    
-    allowed_org_ids = {r.organization_id for r in requester_admin_roles}
+    # NOTE: User requested to see/assign to ALL organizations.
+    # We are relaxing the check that the requester must be an admin of the target org.
+    # Any admin of the *current* org can now assign users to *any* org.
     
     results = []
     
     for org_id in target_orgs:
-        if org_id not in allowed_org_ids:
-            print(f"WARNING: User {ctx.user_id} tried to invite to {org_id} but is not admin.")
-            continue
-            
         # Check if role exists for this user in this org
         existing_role = db.query(models.UserRole).filter(
             models.UserRole.user_id == user.id,

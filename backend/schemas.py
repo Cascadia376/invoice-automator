@@ -157,6 +157,9 @@ class OrganizationBase(BaseModel):
     name: str
     subscription_status: str = "free"
 
+class OrganizationCreate(OrganizationBase):
+    pass
+
 class Organization(OrganizationBase):
     id: str
     created_at: datetime
