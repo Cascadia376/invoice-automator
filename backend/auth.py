@@ -5,7 +5,9 @@ from fastapi import Depends, HTTPException, status, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Optional
-from jwt import PyJWKClient
+import httpx
+from cachetools import TTLCache, cached
+from jwt import decode, algorithms
 
 class UserContext(BaseModel):
     user_id: str
@@ -30,7 +32,26 @@ if AUTH_MODE == "strict" and "AUTH_REQUIRED" not in os.environ:
 
 # JWKS Setup
 JWKS_URL = f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json" if SUPABASE_URL else None
-jwks_client = PyJWKClient(JWKS_URL) if JWKS_URL else None
+jwks_cache = TTLCache(maxsize=1, ttl=3600) # Cache JWKS for 1 hour
+
+async def get_jwks():
+    """Fetch JWKS from Supabase with caching."""
+    if "jwks" in jwks_cache:
+        return jwks_cache["jwks"]
+    
+    if not JWKS_URL:
+        return None
+        
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(JWKS_URL)
+            response.raise_for_status()
+            jwks = response.json()
+            jwks_cache["jwks"] = jwks
+            return jwks
+    except Exception as e:
+        print(f"AUTH ERROR: Failed to fetch JWKS: {str(e)}")
+        return None
 
 # Fallback for log-only mode to avoid 500s in routers expecting ctx.org_id
 LOG_ONLY_FALLBACK = UserContext(user_id="anon-user", org_id="anon-org", email="anon@example.com")
@@ -65,19 +86,36 @@ async def get_current_user(
     token = credentials.credentials
     
     # 4. Verification Attempt 1: RS256 (Modern / JWKS)
-    if jwks_client:
+    jwks = await get_jwks()
+    if jwks:
         try:
-            signing_key = jwks_client.get_signing_key_from_jwt(token)
-            payload = jwt.decode(
-                token,
-                signing_key.key,
-                algorithms=["RS256"],
-                audience=SUPABASE_JWT_AUD,
-                options={"verify_aud": True}
-            )
-            print(f"AUTH: Success via RS256 (JWKS)")
-            return _context_from_payload(payload)
-        except Exception:
+            # Extract kid from header
+            unverified_header = jwt.get_unverified_header(token)
+            kid = unverified_header.get("kid")
+            
+            # Find matching key
+            key_data = None
+            for key in jwks.get("keys", []):
+                if key.get("kid") == kid:
+                    key_data = key
+                    break
+            
+            if key_data:
+                # Construct public key from JWK
+                from jwt.algorithms import RSAAlgorithm
+                public_key = RSAAlgorithm.from_jwk(key_data)
+                
+                payload = jwt.decode(
+                    token,
+                    public_key,
+                    algorithms=["RS256"],
+                    audience=SUPABASE_JWT_AUD,
+                    options={"verify_aud": True}
+                )
+                print(f"AUTH: Success via RS256 (JWKS)")
+                return _context_from_payload(payload)
+        except Exception as e:
+            print(f"AUTH FAIL (RS256): {str(e)}")
             pass
 
     # 5. Verification Attempt 2: HS256 (Legacy / Secret)
