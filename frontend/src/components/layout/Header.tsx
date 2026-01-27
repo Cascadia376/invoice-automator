@@ -25,9 +25,7 @@ export const Header = () => {
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl">
       <nav className="container flex h-16 items-center justify-between">
         <Link to="/" className="flex items-center gap-2 font-semibold text-lg">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-primary">
-            <FileText className="h-5 w-5 text-white" />
-          </div>
+          <img src="/logo.png" alt="Cascadia Invoice Agent" className="h-8 w-auto rounded-lg" />
           <span className="hidden sm:inline-block">Cascadia Invoice Agent</span>
         </Link>
 

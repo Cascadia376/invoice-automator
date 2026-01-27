@@ -25,9 +25,12 @@ export function AppHeader() {
         <header className="border-b bg-card sticky top-0 z-10">
             <div className="container mx-auto px-4 h-16 flex items-center justify-between max-w-7xl">
                 <div className="flex items-center gap-8">
-                    <h2 className="text-xl font-bold text-foreground">
-                        Cascadia Invoice Agent
-                    </h2>
+                    <div className="flex items-center gap-2">
+                        <img src="/logo.png" alt="Cascadia Invoice Agent" className="h-8 w-auto rounded-lg" />
+                        <h2 className="text-xl font-bold text-foreground">
+                            Cascadia Invoice Agent
+                        </h2>
+                    </div>
 
                     <nav className="hidden md:flex items-center gap-1">
                         {navItems.map((item) => (

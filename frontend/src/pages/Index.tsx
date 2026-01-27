@@ -51,7 +51,10 @@ const Index = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
+        <CardHeader className="space-y-1 flex flex-col items-center">
+          <div className="mb-4">
+            <img src="/logo.png" alt="Cascadia Invoice Agent" className="h-12 w-auto rounded-lg" />
+          </div>
           <CardTitle className="text-2xl font-bold text-center">Sign in</CardTitle>
           <CardDescription className="text-center">
             Enter your email and password to access your account

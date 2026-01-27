@@ -8,9 +8,7 @@ export const Footer = () => {
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-primary">
-                <FileText className="h-5 w-5 text-white" />
-              </div>
+              <img src="/logo-footer.png" alt="Cascadia Invoice Agent" className="h-8 w-auto" />
               <span className="font-semibold text-lg">Cascadia Invoice Agent</span>
             </div>
             <p className="text-sm text-muted-foreground">
