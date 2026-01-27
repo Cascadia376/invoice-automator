@@ -17,6 +17,7 @@ import VendorDetail from "./pages/VendorDetail";
 import APSageView from "./pages/APSageView";
 import APPosView from "./pages/APPosView";
 import NotFound from "./pages/NotFound";
+import SmokeTest from "./pages/SmokeTest";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 
 const queryClient = new QueryClient();
@@ -82,7 +83,7 @@ const App = () => {
                     <Route path="/vendors" element={<Vendors />} />
                     <Route path="/ap-view" element={<APSageView />} />
                     <Route path="/ap-pos-view" element={<APPosView />} />
-                    <Route path="/ap-pos-view" element={<APPosView />} />
+                    <Route path="/smoke-test" element={<SmokeTest />} />
                     <Route element={<RequireRole role="admin" />}>
                       <Route path="/settings" element={<Settings />} />
                     </Route>

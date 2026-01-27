@@ -58,6 +58,7 @@ app.include_router(debug.router)
 app.include_router(auth_router.router)
 
 @app.get("/")
+@app.get("/health")
 def health_check():
     from database import SQLALCHEMY_DATABASE_URL
     import auth
@@ -71,4 +72,14 @@ def health_check():
         "supabase_url": bool(auth.SUPABASE_URL),
         "supabase_jwt_secret_present": bool(auth.SUPABASE_JWT_SECRET),
         "jwks_client_ready": bool(auth.jwks_client)
+    }
+
+@app.get("/whoami")
+async def whoami(ctx: auth.UserContext = Depends(auth.get_current_user)):
+    import auth
+    return {
+        "user_id": ctx.user_id if ctx else None,
+        "email": ctx.email if ctx else None,
+        "authenticated": ctx is not None,
+        "auth_required": auth.AUTH_REQUIRED
     }

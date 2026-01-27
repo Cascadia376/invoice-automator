@@ -6,8 +6,8 @@ import { ArrowLeft, Activity, Shield, AlertCircle, CheckCircle2 } from 'lucide-r
 export default async function SmokeTestPage() {
     // Fetch both endpoints in parallel
     const [healthRes, whoAmIRes] = await Promise.all([
-        apiFetch<HealthResponse>('/'),
-        apiFetch<UserContext>('/api/auth/whoami')
+        apiFetch<HealthResponse>('/health'),
+        apiFetch<UserContext>('/whoami')
     ])
 
     return (
@@ -31,7 +31,7 @@ export default async function SmokeTestPage() {
                 <div className="grid gap-6">
                     {/* Health Check Section */}
                     <Section
-                        title="System Health (/)"
+                        title="System Health (/health)"
                         icon={<Activity size={20} />}
                         data={healthRes.data}
                         error={healthRes.error}
@@ -50,7 +50,7 @@ export default async function SmokeTestPage() {
 
                     {/* WhoAmI Section */}
                     <Section
-                        title="Authentication Context (/api/auth/whoami)"
+                        title="Authentication Context (/whoami)"
                         icon={<Shield size={20} />}
                         data={whoAmIRes.data}
                         error={whoAmIRes.error}
