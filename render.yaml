@@ -21,4 +21,6 @@ services:
         sync: false # Must be set to allow authenticated requests
       - key: SUPABASE_JWT_AUD
         value: authenticated
+      - key: SUPABASE_URL
+        sync: false # Required for fetching RS256 signing keys automatically
     autoDeploy: true
