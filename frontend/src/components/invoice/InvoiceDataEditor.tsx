@@ -308,7 +308,37 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
       toast.success("Issue reported successfully");
     } catch (error) {
       console.error(error);
-      toast.error("Failed to report issue");
+    } finally {
+      setIsSubmittingIssue(false);
+    }
+  };
+
+
+  const handleUpdateIssue = async (issueId: string, description: string) => {
+    setIsSubmittingIssue(true);
+    try {
+      const token = await getToken();
+      const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+
+      const response = await fetch(`${API_BASE}/api/issues/${issueId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          description
+        })
+      });
+
+      if (!response.ok) throw new Error("Failed to update issue");
+
+      const updatedIssue = await response.json();
+      setLocalIssues(prev => prev.map(iss => iss.id === issueId ? updatedIssue : iss));
+      toast.success("Issue updated successfully");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update issue");
     } finally {
       setIsSubmittingIssue(false);
     }
@@ -658,6 +688,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                                 lineItemId={safeLineItems[index]?.id}
                                 issues={localIssues.filter(iss => iss.lineItems?.some(li => li.id === safeLineItems[index]?.id))}
                                 onCreate={(type, desc) => handleCreateIssue(index, type, desc)}
+                                onUpdate={handleUpdateIssue}
                                 loading={isSubmittingIssue}
                               />
                             </PopoverContent>
@@ -823,15 +854,27 @@ function IssuePopoverContent({
   lineItemId,
   issues,
   onCreate,
+  onUpdate,
   loading
 }: {
   lineItemId: string,
   issues: any[],
   onCreate: (type: string, desc: string) => void,
+  onUpdate?: (id: string, desc: string) => void,
   loading: boolean
 }) {
   const [type, setType] = useState<string>("");
   const [description, setDescription] = useState("");
+  const [editMode, setEditMode] = useState(false);
+  const [editDescription, setEditDescription] = useState("");
+
+  const issue = issues[0];
+
+  useEffect(() => {
+    if (issue) {
+      setEditDescription(issue.description || "");
+    }
+  }, [issue]);
 
   if (issues.length > 0) {
     return (
@@ -848,10 +891,49 @@ function IssuePopoverContent({
           <p className="text-sm capitalize">{issues[0].type.replace('_', ' ')}</p>
         </div>
         <div className="space-y-1">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-tighter">Details</p>
-          <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded border border-gray-100 italic">
-            "{issues[0].description}"
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-tighter">Details</p>
+            {!editMode && (
+              <Button variant="ghost" size="sm" className="h-5 text-[10px] px-1" onClick={() => setEditMode(true)}>
+                Edit
+              </Button>
+            )}
+          </div>
+
+          {editMode ? (
+            <div className="space-y-2">
+              <Textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                className="text-xs min-h-[60px]"
+              />
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={() => {
+                    onUpdate?.(issues[0].id, editDescription);
+                    setEditMode(false);
+                  }}
+                  disabled={loading}
+                >
+                  Save
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={() => setEditMode(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded border border-gray-100 italic">
+              "{issues[0].description}"
+            </p>
+          )}
         </div>
         {issues[0].communications?.length > 0 && (
           <div className="space-y-2">

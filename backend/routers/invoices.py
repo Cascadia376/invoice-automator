@@ -283,7 +283,10 @@ def read_invoice(
     ctx: auth.UserContext = Depends(auth.get_current_user)
 ):
     print(f"READ REQUEST: Fetching invoice {invoice_id}")
-    invoice = db.query(models.Invoice).options(joinedload(models.Invoice.line_items)).filter(
+    invoice = db.query(models.Invoice).options(
+        joinedload(models.Invoice.line_items),
+        joinedload(models.Invoice.issues).joinedload(models.Issue.line_items)
+    ).filter(
         models.Invoice.id == invoice_id,
         models.Invoice.organization_id == ctx.org_id
     ).first()

@@ -99,6 +99,7 @@ class Invoice(InvoiceBase):
     id: str
     created_at: datetime
     line_items: List[LineItem] = []
+    issues: List["Issue"] = []
     category_summary: Optional[Dict[str, float]] = None
 
     model_config = {
