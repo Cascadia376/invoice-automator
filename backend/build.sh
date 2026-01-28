@@ -28,7 +28,7 @@ pip list
 echo "Verifying openai import..."
 python -c "import openai; print('openai imported successfully')"
 
-echo "Running database migrations..."
-python migrate.py
+echo "Skipping migrations during build to prevent Max Connection errors..."
+# python migrate.py
 
 echo "Build complete!"
