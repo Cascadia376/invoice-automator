@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useInvoice } from "@/context/InvoiceContext";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Loader2, Shield } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Shield, Activity } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -82,6 +83,7 @@ interface Organization {
 export default function Settings() {
     const { glCategories, createGLCategory, updateGLCategory, deleteGLCategory } = useInvoice();
     const { isAdmin, getToken } = useAuth();
+    const navigate = useNavigate();
 
     // GL Category State
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -433,43 +435,49 @@ export default function Settings() {
                                     Manage General Ledger categories for invoice line items.
                                 </p>
                             </div>
-                            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                                <DialogTrigger asChild>
-                                    <Button onClick={openAddDialog}>
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        Add Category
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                    <DialogHeader>
-                                        <DialogTitle>{editingCategory ? "Edit Category" : "Add Category"}</DialogTitle>
-                                        <DialogDescription>
-                                            {editingCategory ? "Update the GL category details." : "Create a new GL category for classification."}
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="code">GL Code</Label>
-                                            <Input id="code" placeholder="e.g. 6010" {...register("code")} />
-                                            {errors.code && <p className="text-sm text-destructive">{errors.code.message}</p>}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="name">Category Name</Label>
-                                            <Input id="name" placeholder="e.g. Marketing & Advertising" {...register("name")} />
-                                            {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
-                                        </div>
-                                        <DialogFooter>
-                                            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                                                Cancel
-                                            </Button>
-                                            <Button type="submit" disabled={isLoading}>
-                                                {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                                {editingCategory ? "Save Changes" : "Create Category"}
-                                            </Button>
-                                        </DialogFooter>
-                                    </form>
-                                </DialogContent>
-                            </Dialog>
+                            <div className="flex gap-2">
+                                <Button variant="secondary" onClick={() => navigate('/smoke-test')}>
+                                    <Activity className="h-4 w-4 mr-2" />
+                                    Run Smoke Test
+                                </Button>
+                                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button onClick={openAddDialog}>
+                                            <Plus className="h-4 w-4 mr-2" />
+                                            Add Category
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>{editingCategory ? "Edit Category" : "Add Category"}</DialogTitle>
+                                            <DialogDescription>
+                                                {editingCategory ? "Update the GL category details." : "Create a new GL category for classification."}
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="code">GL Code</Label>
+                                                <Input id="code" placeholder="e.g. 6010" {...register("code")} />
+                                                {errors.code && <p className="text-sm text-destructive">{errors.code.message}</p>}
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="name">Category Name</Label>
+                                                <Input id="name" placeholder="e.g. Marketing & Advertising" {...register("name")} />
+                                                {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+                                            </div>
+                                            <DialogFooter>
+                                                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                                                    Cancel
+                                                </Button>
+                                                <Button type="submit" disabled={isLoading}>
+                                                    {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                                    {editingCategory ? "Save Changes" : "Create Category"}
+                                                </Button>
+                                            </DialogFooter>
+                                        </form>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
                         </div>
 
                         <div className="border rounded-md">

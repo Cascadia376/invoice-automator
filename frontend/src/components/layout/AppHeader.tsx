@@ -1,4 +1,4 @@
-import { Home, Upload, Settings, AlertCircle, TrendingUp, Activity } from "lucide-react";
+import { Home, Upload, Settings, AlertCircle, TrendingUp } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -11,7 +11,6 @@ export function AppHeader() {
         { icon: AlertCircle, label: "Issue Tracker", href: "/issues" },
         { icon: TrendingUp, label: "AP View", href: "/ap-pos-view" },
         { icon: Upload, label: "Upload", href: "/upload" },
-        { icon: Activity, label: "Smoke Test", href: "/smoke-test" },
         // Only show Settings to Admins
         ...(isAdmin ? [{ icon: Settings, label: "Settings", href: "/settings" }] : []),
     ];

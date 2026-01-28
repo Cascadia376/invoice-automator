@@ -220,8 +220,11 @@ def get_dashboard_stats(
     needs_review = base_query.filter(models.Invoice.status == 'needs_review').count()
     approved = base_query.filter(or_(models.Invoice.status == 'approved', models.Invoice.status == 'pushed')).count()
     
-    # Invoices with issues: an invoice is considered to have an issue if any of its line items have an issue_type
-    issue_count = base_query.filter(models.Invoice.line_items.any(models.LineItem.issue_type.isnot(None))).count()
+    # Invoices with issues: Count active issues from the Issue model
+    issue_count = db.query(models.Issue).filter(
+        models.Issue.organization_id == ctx.org_id,
+        or_(models.Issue.status == 'open', models.Issue.status == 'reported')
+    ).count()
     
     # Calculate time saved (15 mins per approved invoice)
     hours_saved = (approved * 15) / 60
