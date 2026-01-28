@@ -1,6 +1,6 @@
 import os
 from sqlalchemy import create_engine
-from sqlalchemy.pool import NullPool
+
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -56,13 +56,19 @@ except:
     pass
 
 # Pooling configuration for Render/Supabase stability
-# Use NullPool with Supabase Transaction Pooler (port 6543/5432 pooler)
-# Client-side pooling is detrimental when using a transaction pooler.
+# Use QueuePool with strict limits to prevent "Max client connections reached"
+# Default to 5 connections, with up to 10 overflow.
+pool_size = int(os.getenv("DB_POOL_SIZE", "5"))
+max_overflow = int(os.getenv("DB_MAX_OVERFLOW", "10"))
+
 engine_kwargs = {"connect_args": connect_args}
+
 if "postgresql" in SQLALCHEMY_DATABASE_URL:
     engine_kwargs.update({
-        "poolclass": NullPool,
-        # Remove pool_size/max_overflow/recycle as they don't apply to NullPool
+        "pool_size": pool_size,
+        "max_overflow": max_overflow,
+        "pool_recycle": 300,  # Recycle connections every 5 minutes
+        "pool_pre_ping": True, # CPing connection before use (catch stale ones)
     })
 
 engine = create_engine(
