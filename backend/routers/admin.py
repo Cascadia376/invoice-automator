@@ -75,52 +75,65 @@ def list_users(
         )
 
     # 2. Fetch all roles/store mappings from DB
-    user_roles = db.query(models.UserRole).all()
-    
-    # 3. Fetch all stores to map IDs to names
-    all_stores = db.query(models.Store).all()
-    store_map = {str(s.store_id): s.name for s in all_stores}
+    try:
+        user_roles = db.query(models.UserRole).all()
+        
+        # 3. Fetch all stores to map IDs to names
+        all_stores = db.query(models.Store).all()
+        store_map = {str(s.store_id): s.name for s in all_stores}
 
-    # Group roles by user_id
-    # user_roles_map = { user_id: { roles: set(), store_ids: [] } }
-    user_roles_map = {}
-    for ur in user_roles:
-        if ur.user_id not in user_roles_map:
-            user_roles_map[ur.user_id] = {"roles": set(), "store_ids": set()}
-        
-        user_roles_map[ur.user_id]["roles"].add(ur.role_id)
-        user_roles_map[ur.user_id]["store_ids"].add(ur.organization_id)
+        # Group roles by user_id
+        # user_roles_map = { user_id: { roles: set(), store_ids: [] } }
+        user_roles_map = {}
+        for ur in user_roles:
+            if ur.user_id not in user_roles_map:
+                user_roles_map[ur.user_id] = {"roles": set(), "store_ids": set()}
+            
+            user_roles_map[ur.user_id]["roles"].add(ur.role_id)
+            user_roles_map[ur.user_id]["store_ids"].add(ur.organization_id)
 
-    # 4. Merge Data
-    result = []
-    for u in auth_users:
-        uid = u.id
-        
-        # Get DB Data
-        db_data = user_roles_map.get(uid, {"roles": [], "store_ids": []})
-        
-        # Format Stores
-        relevant_stores = []
-        for sid in db_data["store_ids"]:
-            if sid in store_map:
-                relevant_stores.append(schemas.StoreSchema(id=sid, name=store_map[sid]))
-            else:
-                relevant_stores.append(schemas.StoreSchema(id=sid, name="Unknown Store"))
-        
-        # Extract Metadata
-        meta = u.user_metadata or {}
-        
-        result.append(schemas.UserResponse(
-            id=uid,
-            email=u.email or "",
-            first_name=meta.get("first_name") or meta.get("firstName"),
-            last_name=meta.get("last_name") or meta.get("lastName"),
-            roles=list(db_data["roles"]),
-            stores=relevant_stores,
-            created_at=datetime.fromisoformat(u.created_at.replace('Z', '+00:00')) if u.created_at else None
-        ))
-        
-    return result
+        # 4. Merge Data
+        result = []
+        for u in auth_users:
+            uid = u.id
+            
+            # Get DB Data
+            db_data = user_roles_map.get(uid, {"roles": [], "store_ids": []})
+            
+            # Format Stores
+            relevant_stores = []
+            for sid in db_data["store_ids"]:
+                if sid in store_map:
+                    relevant_stores.append(schemas.StoreSchema(id=sid, name=store_map[sid]))
+                else:
+                    relevant_stores.append(schemas.StoreSchema(id=sid, name="Unknown Store"))
+            
+            # Extract Metadata
+            meta = u.user_metadata or {}
+            
+            # Safely parse created_at
+            c_at = None
+            if u.created_at:
+                if isinstance(u.created_at, str):
+                    c_at = datetime.fromisoformat(u.created_at.replace('Z', '+00:00'))
+                else:
+                    c_at = u.created_at
+            
+            result.append(schemas.UserResponse(
+                id=uid,
+                email=u.email or "",
+                first_name=meta.get("first_name") or meta.get("firstName"),
+                last_name=meta.get("last_name") or meta.get("lastName"),
+                roles=list(db_data["roles"]),
+                stores=relevant_stores,
+                created_at=c_at
+            ))
+            
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Data Processing Error: {str(e)}")
 
 @router.put("/admin/users/{user_id}", dependencies=[Depends(auth.require_role("admin"))])
 def update_user(
