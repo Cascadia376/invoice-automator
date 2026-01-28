@@ -170,43 +170,53 @@ def _context_from_payload(payload: dict) -> UserContext:
 
 from database import get_db
 
+from typing import Set, Union
+
+def require_roles(allowed_roles: Union[str, Set[str]]):
+    if isinstance(allowed_roles, str):
+        allowed_roles = {allowed_roles}
+    return RoleChecker(allowed_roles)
+
+# Keep legacy alias for backward compatibility
 def require_role(role_name: str):
-    return RoleChecker(role_name)
+    return require_roles({role_name})
 
 class RoleChecker:
-    def __init__(self, allowed_role: str):
-        self.allowed_role = allowed_role
+    def __init__(self, allowed_roles: Set[str]):
+        self.allowed_roles = allowed_roles
 
     def __call__(self, ctx: Optional[UserContext] = Depends(get_current_user), db = Depends(get_db)):
         # Bypass role checks in log-only or disabled modes to prevent disruption during rollout
         if DISABLE_AUTH or AUTH_MODE == "log-only" or (not AUTH_REQUIRED and not ctx):
             if AUTH_MODE == "log-only":
-                logger.info(f"AUTH ROLE (Log-only): Bypassing role check for {self.allowed_role}")
-            return True
+                logger.info(f"AUTH ROLE (Log-only): Bypassing role check for {self.allowed_roles}")
+            # Mock context for bypass
+            return {"user_id": "bypass", "role": list(self.allowed_roles)[0], "internal_user_id": "bypass"}
         
         if not ctx:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
         import models
-        has_role = db.query(models.UserRole).filter(
+        
+        # Check if user has ANY of the allowed roles
+        # We also check for 'admin' as a super-role that can access anything
+        roles_to_check = self.allowed_roles.union({"admin"})
+        
+        user_role = db.query(models.UserRole).filter(
             models.UserRole.user_id == ctx.user_id,
-            models.UserRole.role_id == self.allowed_role,
+            models.UserRole.role_id.in_(roles_to_check),
             models.UserRole.organization_id == ctx.org_id
         ).first()
         
-        if not has_role:
-             # Admin fallback
-             if self.allowed_role != "admin":
-                 is_admin = db.query(models.UserRole).filter(
-                    models.UserRole.user_id == ctx.user_id,
-                    models.UserRole.role_id == "admin",
-                    models.UserRole.organization_id == ctx.org_id
-                ).first()
-                 if is_admin:
-                     return True
-
+        if not user_role:
              raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, 
-                detail=f"Operation requires {self.allowed_role} role"
+                detail=f"Operation requires one of roles: {self.allowed_roles}"
             )
-        return True
+            
+        return {
+            "user_id": ctx.user_id,
+            "role": user_role.role_id,
+            "internal_user_id": ctx.user_id, # Mapping sub to internal_id as no User table exists
+            "org_id": ctx.org_id 
+        }
