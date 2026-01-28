@@ -581,6 +581,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                             {...register(`lineItems.${index}.sku`)}
                             className="h-7 w-full bg-transparent border-transparent hover:border-input focus:border-input px-2 text-xs"
                             placeholder="SKU"
+                            onFocus={() => onFieldFocus?.(`lineItems[${index}].sku`)}
                           />
                         </TableCell>
                       )}
@@ -589,6 +590,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                           <Input
                             {...register(`lineItems.${index}.description`)}
                             className="h-7 w-full bg-transparent border-transparent hover:border-input focus:border-input px-2 text-xs"
+                            onFocus={() => onFieldFocus?.(`lineItems[${index}].description`)}
                           />
                         </TableCell>
                       )}
@@ -598,6 +600,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                             type="number"
                             {...register(`lineItems.${index}.unitsPerCase`)}
                             className="h-7 w-full bg-transparent border-transparent hover:border-input focus:border-input px-2 text-right text-xs"
+                            onFocus={() => onFieldFocus?.(`lineItems[${index}].unitsPerCase`)}
                           />
                         </TableCell>
                       )}
@@ -607,6 +610,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                             type="number"
                             {...register(`lineItems.${index}.cases`)}
                             className="h-7 w-full bg-transparent border-transparent hover:border-input focus:border-input px-2 text-right text-xs"
+                            onFocus={() => onFieldFocus?.(`lineItems[${index}].cases`)}
                           />
                         </TableCell>
                       )}
@@ -624,6 +628,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                               }
                             })}
                             className="h-7 w-full bg-transparent border-transparent hover:border-input focus:border-input px-2 text-right text-xs"
+                            onFocus={() => onFieldFocus?.(`lineItems[${index}].quantity`)}
                           />
                         </TableCell>
                       )}
@@ -642,6 +647,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                               }
                             })}
                             className="h-7 w-full bg-transparent border-transparent hover:border-input focus:border-input px-2 text-right text-xs"
+                            onFocus={() => onFieldFocus?.(`lineItems[${index}].unitCost`)}
                           />
                         </TableCell>
                       )}
@@ -774,6 +780,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                     step="0.01"
                     {...register("subtotal")}
                     className={cn("w-28 text-right h-7 text-xs", subtotalMismatch && "border-yellow-400 bg-yellow-50")}
+                    onFocus={() => onFieldFocus?.("subtotal")}
                   />
                 </div>
               </div>
@@ -818,6 +825,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
                   step="0.01"
                   {...register("depositAmount")}
                   className="w-28 text-right h-7 text-xs"
+                  onFocus={() => onFieldFocus?.("depositAmount")}
                 />
               </div>
               <Separator />
