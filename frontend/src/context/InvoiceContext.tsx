@@ -54,7 +54,8 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             if (!token && !disableAuth) return;
             const response = await fetch(`${API_URL}/invoices/stats`, {
                 headers: {
-                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    ...(orgId ? { "x-organization-id": orgId } : {})
                 }
             });
             if (response.ok) {
@@ -64,7 +65,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         } catch (error) {
             console.error("Failed to fetch stats", error);
         }
-    }, [getToken, disableAuth]);
+    }, [getToken, disableAuth, orgId]);
 
     const [retryCount, setRetryCount] = useState(0);
 
@@ -103,7 +104,8 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             }
             const response = await fetch(url, {
                 headers: {
-                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    ...(orgId ? { "x-organization-id": orgId } : {})
                 }
             });
             if (response.ok) {
@@ -139,7 +141,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         } finally {
             setIsLoading(false);
         }
-    }, [getToken, disableAuth, retryCount, refreshStats]); // Added retryCount and refreshStats to deps
+    }, [getToken, disableAuth, retryCount, refreshStats, orgId]); // Added retryCount and refreshStats to deps
 
     const setPage = useCallback((page: number) => {
         const skip = (page - 1) * pageSize;
@@ -152,7 +154,8 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             if (!token && !disableAuth) return;
             const response = await fetch(`${API_URL}/gl-categories`, {
                 headers: {
-                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    ...(orgId ? { "x-organization-id": orgId } : {})
                 }
             });
             if (response.ok) {
@@ -162,7 +165,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         } catch (error) {
             console.error("Failed to fetch GL categories", error);
         }
-    }, [getToken, disableAuth]);
+    }, [getToken, disableAuth, orgId]);
 
     useEffect(() => {
         // Optimization: Skip fetching data if we are in the standalone PDF view
@@ -198,7 +201,8 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    ...(orgId ? { "x-organization-id": orgId } : {})
                 },
                 body: JSON.stringify(data),
             });
@@ -230,7 +234,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             setInvoices(previousInvoices);
             toast.error("Network error updating invoice");
         }
-    }, [invoices, getToken]);
+    }, [invoices, getToken, orgId]);
 
     const uploadInvoice = async (file: File) => {
         const formData = new FormData();
@@ -265,7 +269,10 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const token = await getToken();
             const response = await fetch(`${API_URL}/invoices/${id}`, {
                 method: 'DELETE',
-                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    ...(orgId ? { "x-organization-id": orgId } : {})
+                },
             });
 
             if (response.ok) {
@@ -288,7 +295,8 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    ...(orgId ? { "x-organization-id": orgId } : {})
                 },
                 body: JSON.stringify(category),
             });
@@ -310,7 +318,8 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    ...(orgId ? { "x-organization-id": orgId } : {})
                 },
                 body: JSON.stringify(category),
             });
@@ -330,7 +339,10 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const token = await getToken();
             const response = await fetch(`${API_URL}/gl-categories/${id}`, {
                 method: 'DELETE',
-                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    ...(orgId ? { "x-organization-id": orgId } : {})
+                },
             });
             if (response.ok) {
                 setGlCategories(prev => prev.filter(c => c.id !== id));
@@ -346,7 +358,10 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         try {
             const token = await getToken();
             const response = await fetch(`${API_URL}/sku-mappings/${sku}`, {
-                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    ...(orgId ? { "x-organization-id": orgId } : {})
+                }
             });
             if (response.ok) {
                 const data = await response.json();

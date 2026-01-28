@@ -145,7 +145,9 @@ async def get_supabase_user(
 
 async def get_current_user(
     claims: Optional[dict] = Depends(get_supabase_user),
-    x_api_key: Optional[str] = Header(None)
+    x_api_key: Optional[str] = Header(None),
+    x_organization_id: Optional[str] = Header(None, alias="x-organization-id"),
+    db = Depends(get_db)
 ) -> Optional[UserContext]:
     """
     Wraps get_supabase_user to return a structured UserContext.
@@ -159,7 +161,30 @@ async def get_current_user(
     if not claims:
         return LOG_ONLY_FALLBACK if AUTH_MODE == "log-only" else None
 
-    return _context_from_payload(claims)
+    ctx = _context_from_payload(claims)
+    
+    # Handle Organization Switch (Store Switch)
+    if x_organization_id and x_organization_id != ctx.org_id:
+        if DISABLE_AUTH:
+            ctx.org_id = x_organization_id
+        else:
+            # Verify user belongs to the target organization
+            import models
+            user_has_access = db.query(models.UserRole).filter(
+                models.UserRole.user_id == ctx.user_id,
+                models.UserRole.organization_id == x_organization_id
+            ).first()
+            
+            if user_has_access:
+                # logger.info(f"AUTH SWAP: User {ctx.user_id} switched to Org {x_organization_id}")
+                ctx.org_id = x_organization_id
+            else:
+                logger.warning(f"AUTH FAIL: User {ctx.user_id} attempted to access Org {x_organization_id} without role")
+                # We do NOT throw here to avoid breaking the request if it was just a hint? 
+                # Actually we should throw 403 if they explicitly asked for it and can't have it.
+                raise HTTPException(status_code=403, detail="Not authorized for this organization")
+
+    return ctx
 
 def _context_from_payload(payload: dict) -> UserContext:
     user_id = payload.get("sub")
