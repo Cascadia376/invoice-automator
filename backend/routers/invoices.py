@@ -609,6 +609,17 @@ def get_invoice_highlights(
         add_highlight("invoice_number", invoice.invoice_number)
         add_highlight("total_amount", f"{invoice.total_amount:.2f}")
         add_highlight("total_amount", f"{invoice.total_amount:,.2f}")
+        add_highlight("subtotal", f"{invoice.subtotal:.2f}")
+        add_highlight("subtotal", f"{invoice.subtotal:,.2f}")
+        add_highlight("tax_amount", f"{invoice.tax_amount:.2f}")
+        add_highlight("tax_amount", f"{invoice.tax_amount:,.2f}")
+        add_highlight("deposit_amount", f"{invoice.deposit_amount:.2f}")
+        add_highlight("deposit_amount", f"{invoice.deposit_amount:,.2f}")
+        add_highlight("shipping_amount", f"{invoice.shipping_amount:.2f}")
+        add_highlight("shipping_amount", f"{invoice.shipping_amount:,.2f}")
+        add_highlight("discount_amount", f"{invoice.discount_amount:.2f}")
+        add_highlight("discount_amount", f"{invoice.discount_amount:,.2f}")
+        add_highlight("po_number", invoice.po_number)
         add_highlight("date", invoice.date)
         add_highlight("vendor_name", invoice.vendor_name)
         
@@ -617,7 +628,10 @@ def get_invoice_highlights(
             add_highlight(f"{prefix}.amount", f"{item.amount:.2f}")
             add_highlight(f"{prefix}.unit_cost", f"{item.unit_cost:.2f}")
             add_highlight(f"{prefix}.quantity", str(int(item.quantity) if item.quantity.is_integer() else item.quantity))
+            add_highlight(f"{prefix}.sku", item.sku)
             add_highlight(f"{prefix}.description", item.description)
+            add_highlight(f"{prefix}.units_per_case", str(int(item.units_per_case) if item.units_per_case.is_integer() else item.units_per_case))
+            add_highlight(f"{prefix}.cases", str(int(item.cases) if item.cases.is_integer() else item.cases))
 
         doc.close()
         if os.path.exists(temp_file_path):
