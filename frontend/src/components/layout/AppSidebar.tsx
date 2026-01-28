@@ -3,9 +3,16 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 export function AppSidebar() {
-    const { signOut } = useAuth();
+    const { signOut, user, orgId, stores, switchStore } = useAuth();
     const navigate = useNavigate();
 
     const navItems = [
@@ -30,6 +37,22 @@ export function AppSidebar() {
                         Cascadia Invoice Assistant
                     </h2>
                 </div>
+                {stores.length > 1 && (
+                    <div className="px-2">
+                        <Select value={orgId || ""} onValueChange={switchStore}>
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select Store" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {stores.map((store) => (
+                                    <SelectItem key={store.id} value={store.id}>
+                                        {store.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
             </div>
 
             <nav className="flex-1 p-4 space-y-2">

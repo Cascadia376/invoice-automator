@@ -45,6 +45,38 @@ def get_my_roles(
     
     return {"roles": [ur.role_id for ur in user_roles]}
 
+@router.get("/users/me/stores", response_model=List[schemas.StoreSchema])
+def get_my_stores(
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """Get stores the current user has access to"""
+    # 1. Get all roles for user to find org IDs
+    user_roles = db.query(models.UserRole).filter(
+        models.UserRole.user_id == ctx.user_id
+    ).all()
+    
+    org_ids = list(set([ur.organization_id for ur in user_roles]))
+    
+    # 2. Convert to ints for Store query (handling potential non-int legacy IDs safely)
+    store_ids = []
+    for oid in org_ids:
+        try:
+            store_ids.append(int(oid))
+        except ValueError:
+            pass
+            
+    # 3. Fetch Stores
+    if not store_ids:
+        return []
+        
+    stores = db.query(models.Store).filter(
+        models.Store.store_id.in_(store_ids)
+    ).all()
+    
+    # 4. Convert to response format
+    return [schemas.StoreSchema(id=str(s.store_id), name=s.name) for s in stores]
+
 @router.get("/admin/organizations", dependencies=[Depends(auth.require_role("admin"))], response_model=List[schemas.StoreSchema])
 def list_all_organizations(
     db: Session = Depends(get_db),
