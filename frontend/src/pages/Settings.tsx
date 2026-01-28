@@ -427,6 +427,22 @@ export default function Settings() {
                         </div>
                     </div>
 
+
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className="text-base font-medium">System</h4>
+                            <p className="text-sm text-muted-foreground">
+                                System tools and diagnostics.
+                            </p>
+                        </div>
+                        <div className="border rounded-md p-4 bg-white">
+                            <Button variant="secondary" onClick={() => navigate('/smoke-test')}>
+                                <Activity className="h-4 w-4 mr-2" />
+                                Run Smoke Test
+                            </Button>
+                        </div>
+                    </div>
+
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
                             <div>
@@ -435,161 +451,157 @@ export default function Settings() {
                                     Manage General Ledger categories for invoice line items.
                                 </p>
                             </div>
-                            <div className="flex gap-2">
-                                <Button variant="secondary" onClick={() => navigate('/smoke-test')}>
-                                    <Activity className="h-4 w-4 mr-2" />
-                                    Run Smoke Test
-                                </Button>
-                                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                                    <DialogTrigger asChild>
-                                        <Button onClick={openAddDialog}>
-                                            <Plus className="h-4 w-4 mr-2" />
-                                            Add Category
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>{editingCategory ? "Edit Category" : "Add Category"}</DialogTitle>
-                                            <DialogDescription>
-                                                {editingCategory ? "Update the GL category details." : "Create a new GL category for classification."}
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="code">GL Code</Label>
-                                                <Input id="code" placeholder="e.g. 6010" {...register("code")} />
-                                                {errors.code && <p className="text-sm text-destructive">{errors.code.message}</p>}
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="name">Category Name</Label>
-                                                <Input id="name" placeholder="e.g. Marketing & Advertising" {...register("name")} />
-                                                {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
-                                            </div>
-                                            <DialogFooter>
-                                                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                                                    Cancel
-                                                </Button>
-                                                <Button type="submit" disabled={isLoading}>
-                                                    {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                                    {editingCategory ? "Save Changes" : "Create Category"}
-                                                </Button>
-                                            </DialogFooter>
-                                        </form>
-                                    </DialogContent>
-                                </Dialog>
-                            </div>
-                        </div>
 
-                        <div className="border rounded-md">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Code</TableHead>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Full Name</TableHead>
-                                        <TableHead className="w-[100px] text-right">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {glCategories.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                                                No categories found. Add one to get started.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        glCategories.map((category) => (
-                                            <TableRow key={category.id}>
-                                                <TableCell className="font-medium">{category.code}</TableCell>
-                                                <TableCell>{category.name}</TableCell>
-                                                <TableCell className="text-muted-foreground">{category.fullName}</TableCell>
-                                                <TableCell className="text-right">
-                                                    <div className="flex justify-end gap-2">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-8 w-8"
-                                                            onClick={() => handleEdit(category)}
-                                                        >
-                                                            <Pencil className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-8 w-8 text-destructive hover:text-destructive"
-                                                            onClick={() => handleDelete(category.id)}
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
+                            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button onClick={openAddDialog}>
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Add Category
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>{editingCategory ? "Edit Category" : "Add Category"}</DialogTitle>
+                                        <DialogDescription>
+                                            {editingCategory ? "Update the GL category details." : "Create a new GL category for classification."}
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="code">GL Code</Label>
+                                            <Input id="code" placeholder="e.g. 6010" {...register("code")} />
+                                            {errors.code && <p className="text-sm text-destructive">{errors.code.message}</p>}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="name">Category Name</Label>
+                                            <Input id="name" placeholder="e.g. Marketing & Advertising" {...register("name")} />
+                                            {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+                                        </div>
+                                        <DialogFooter>
+                                            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                                                Cancel
+                                            </Button>
+                                            <Button type="submit" disabled={isLoading}>
+                                                {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                                {editingCategory ? "Save Changes" : "Create Category"}
+                                            </Button>
+                                        </DialogFooter>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
                         </div>
                     </div>
-                </TabsContent>
 
-                {isAdmin && (
-                    <TabsContent value="team" className="space-y-4 mt-4">
-                        <div className="flex justify-between items-center bg-muted/50 p-4 rounded-lg border">
-                            <div>
-                                <h3 className="font-semibold">Troubleshoot Connection</h3>
-                                <p className="text-xs text-muted-foreground">If users are not loading, check the backend status.</p>
-                            </div>
-                            <Button variant="outline" size="sm" onClick={testAdminConnection}>
-                                Test Admin Connection
-                            </Button>
+                    <div className="border rounded-md">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Code</TableHead>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Full Name</TableHead>
+                                    <TableHead className="w-[100px] text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {glCategories.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                                            No categories found. Add one to get started.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    glCategories.map((category) => (
+                                        <TableRow key={category.id}>
+                                            <TableCell className="font-medium">{category.code}</TableCell>
+                                            <TableCell>{category.name}</TableCell>
+                                            <TableCell className="text-muted-foreground">{category.fullName}</TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8"
+                                                        onClick={() => handleEdit(category)}
+                                                    >
+                                                        <Pencil className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-destructive hover:text-destructive"
+                                                        onClick={() => handleDelete(category.id)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </div>
+            </TabsContent>
+
+            {isAdmin && (
+                <TabsContent value="team" className="space-y-4 mt-4">
+                    <div className="flex justify-between items-center bg-muted/50 p-4 rounded-lg border">
+                        <div>
+                            <h3 className="font-semibold">Troubleshoot Connection</h3>
+                            <p className="text-xs text-muted-foreground">If users are not loading, check the backend status.</p>
                         </div>
-                        {testResult && (
-                            <div className="bg-slate-950 text-slate-50 p-4 rounded-md font-mono text-xs overflow-auto max-h-40">
-                                <pre>{JSON.stringify(testResult, null, 2)}</pre>
-                            </div>
-                        )}
+                        <Button variant="outline" size="sm" onClick={testAdminConnection}>
+                            Test Admin Connection
+                        </Button>
+                    </div>
+                    {testResult && (
+                        <div className="bg-slate-950 text-slate-50 p-4 rounded-md font-mono text-xs overflow-auto max-h-40">
+                            <pre>{JSON.stringify(testResult, null, 2)}</pre>
+                        </div>
+                    )}
 
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h4 className="text-base font-medium">Team Management</h4>
-                                <p className="text-sm text-muted-foreground">
-                                    Manage user roles and permissions.
-                                </p>
-                            </div>
-                            <div className="flex gap-2">
-                                <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
-                                    <DialogTrigger asChild>
-                                        <Button onClick={() => { resetUser(); setIsUserDialogOpen(true); }}>
-                                            <Plus className="h-4 w-4 mr-2" />
-                                            Add User
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>Add User</DialogTitle>
-                                            <DialogDescription>
-                                                Invite a new user to the organization.
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                        <form onSubmit={handleSubmitUser(handleAddUser)} className="space-y-4">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="email">Email Address</Label>
-                                                <Input id="email" type="email" placeholder="user@example.com" {...registerUser("email")} />
-                                                {userErrors.email && <p className="text-sm text-destructive">{userErrors.email.message}</p>}
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="role">Role</Label>
-                                                <Select onValueChange={(val: "admin" | "manager" | "staff") => setValueUser("role", val)} defaultValue="staff">
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select a role" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="admin">Admin</SelectItem>
-                                                        <SelectItem value="manager">Manager</SelectItem>
-                                                        <SelectItem value="staff">Staff</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                                {/* Note: Select interaction with react-hook-form can be tricky without Controller, but simple default works for now if we bind manually or use Controller. 
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <h4 className="text-base font-medium">Team Management</h4>
+                            <p className="text-sm text-muted-foreground">
+                                Manage user roles and permissions.
+                            </p>
+                        </div>
+                        <div className="flex gap-2">
+                            <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button onClick={() => { resetUser(); setIsUserDialogOpen(true); }}>
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Add User
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Add User</DialogTitle>
+                                        <DialogDescription>
+                                            Invite a new user to the organization.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <form onSubmit={handleSubmitUser(handleAddUser)} className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="email">Email Address</Label>
+                                            <Input id="email" type="email" placeholder="user@example.com" {...registerUser("email")} />
+                                            {userErrors.email && <p className="text-sm text-destructive">{userErrors.email.message}</p>}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="role">Role</Label>
+                                            <Select onValueChange={(val: "admin" | "manager" | "staff") => setValueUser("role", val)} defaultValue="staff">
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select a role" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="admin">Admin</SelectItem>
+                                                    <SelectItem value="manager">Manager</SelectItem>
+                                                    <SelectItem value="staff">Staff</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            {/* Note: Select interaction with react-hook-form can be tricky without Controller, but simple default works for now if we bind manually or use Controller. 
                                                 Let's keep it simple: Use native select or proper Controller if this was critical. 
                                                 Actually, let's fix the Select binding properly using a hidden input or just native select for speed/robustness? 
                                                 Better: Re-use the pattern or just use native select for the form?
@@ -598,111 +610,48 @@ export default function Settings() {
                                                 Let's switch to native <select> for "role" inside the form to avoid complex controller setup in this quick edit, 
                                                 OR just use the `setValue` from `useForm` which is available.
                                             */}
-                                                <div className="flex gap-2">
-                                                    {['admin', 'manager', 'staff'].map(role => (
-                                                        <label key={role} className="flex items-center gap-2 cursor-pointer border p-2 rounded hover:bg-muted">
-                                                            <input type="radio" value={role} {...registerUser("role")} />
-                                                            <span className="capitalize">{role}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                                {userErrors.role && <p className="text-sm text-destructive">{userErrors.role.message}</p>}
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <Label>Assign to Stores (Optional)</Label>
-                                                <div className="border rounded-md p-3 space-y-2 max-h-[150px] overflow-y-auto">
-                                                    {availableOrgs.length === 0 ? (
-                                                        <p className="text-sm text-muted-foreground">No other stores available.</p>
-                                                    ) : (
-                                                        availableOrgs.map(org => (
-                                                            <label key={org.id} className="flex items-center gap-2 cursor-pointer">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    value={org.id}
-                                                                    {...registerUser("target_org_ids")}
-                                                                    className="rounded border-gray-300 text-primary focus:ring-primary"
-                                                                />
-                                                                <span className="text-sm">{org.name}</span>
-                                                            </label>
-                                                        ))
-                                                    )}
-                                                </div>
-                                                <p className="text-xs text-muted-foreground">
-                                                    If none selected, defaults to current store only.
-                                                </p>
-                                            </div>
-
-                                            <DialogFooter>
-                                                <Button type="button" variant="outline" onClick={() => setIsUserDialogOpen(false)}>
-                                                    Cancel
-                                                </Button>
-                                                <Button type="submit" disabled={loadingUsers}>
-                                                    {loadingUsers && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                                    Send Invite
-                                                </Button>
-                                            </DialogFooter>
-                                        </form>
-                                    </DialogContent>
-                                </Dialog>
-                            </div>
-
-                            {/* Edit User Dialog */}
-                            <Dialog open={isEditUserOpen} onOpenChange={setIsEditUserOpen}>
-                                <DialogContent>
-                                    <DialogHeader>
-                                        <DialogTitle>Edit User</DialogTitle>
-                                        <DialogDescription>Update user details and access.</DialogDescription>
-                                    </DialogHeader>
-                                    <form onSubmit={handleSubmitEditUser(handleUpdateUser)} className="space-y-4">
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="edit-first-name">First Name</Label>
-                                                <Input id="edit-first-name" {...registerEditUser("first_name")} />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="edit-last-name">Last Name</Label>
-                                                <Input id="edit-last-name" {...registerEditUser("last_name")} />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="edit-email">Email</Label>
-                                            <Input id="edit-email" type="email" {...registerEditUser("email")} />
-                                            {editUserErrors.email && <p className="text-sm text-destructive">{editUserErrors.email.message}</p>}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="edit-role">Role</Label>
                                             <div className="flex gap-2">
                                                 {['admin', 'manager', 'staff'].map(role => (
                                                     <label key={role} className="flex items-center gap-2 cursor-pointer border p-2 rounded hover:bg-muted">
-                                                        <input type="radio" value={role} {...registerEditUser("role")} />
+                                                        <input type="radio" value={role} {...registerUser("role")} />
                                                         <span className="capitalize">{role}</span>
                                                     </label>
                                                 ))}
                                             </div>
+                                            {userErrors.role && <p className="text-sm text-destructive">{userErrors.role.message}</p>}
                                         </div>
+
                                         <div className="space-y-2">
-                                            <Label>Assigned Stores</Label>
+                                            <Label>Assign to Stores (Optional)</Label>
                                             <div className="border rounded-md p-3 space-y-2 max-h-[150px] overflow-y-auto">
-                                                {availableOrgs.map(org => (
-                                                    <label key={org.id} className="flex items-center gap-2 cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            value={org.id}
-                                                            {...registerEditUser("target_org_ids")}
-                                                            className="rounded border-gray-300 text-primary focus:ring-primary"
-                                                        />
-                                                        <span className="text-sm">{org.name}</span>
-                                                    </label>
-                                                ))}
+                                                {availableOrgs.length === 0 ? (
+                                                    <p className="text-sm text-muted-foreground">No other stores available.</p>
+                                                ) : (
+                                                    availableOrgs.map(org => (
+                                                        <label key={org.id} className="flex items-center gap-2 cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                value={org.id}
+                                                                {...registerUser("target_org_ids")}
+                                                                className="rounded border-gray-300 text-primary focus:ring-primary"
+                                                            />
+                                                            <span className="text-sm">{org.name}</span>
+                                                        </label>
+                                                    ))
+                                                )}
                                             </div>
-                                            <p className="text-xs text-muted-foreground">Select stores this user can access.</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                If none selected, defaults to current store only.
+                                            </p>
                                         </div>
+
                                         <DialogFooter>
-                                            <Button type="button" variant="outline" onClick={() => setIsEditUserOpen(false)}>Cancel</Button>
+                                            <Button type="button" variant="outline" onClick={() => setIsUserDialogOpen(false)}>
+                                                Cancel
+                                            </Button>
                                             <Button type="submit" disabled={loadingUsers}>
                                                 {loadingUsers && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                                Save Changes
+                                                Send Invite
                                             </Button>
                                         </DialogFooter>
                                     </form>
@@ -710,84 +659,147 @@ export default function Settings() {
                             </Dialog>
                         </div>
 
-                        <div className="border rounded-md">
-                            <Table>
-                                <TableHeader>
+                        {/* Edit User Dialog */}
+                        <Dialog open={isEditUserOpen} onOpenChange={setIsEditUserOpen}>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Edit User</DialogTitle>
+                                    <DialogDescription>Update user details and access.</DialogDescription>
+                                </DialogHeader>
+                                <form onSubmit={handleSubmitEditUser(handleUpdateUser)} className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit-first-name">First Name</Label>
+                                            <Input id="edit-first-name" {...registerEditUser("first_name")} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit-last-name">Last Name</Label>
+                                            <Input id="edit-last-name" {...registerEditUser("last_name")} />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="edit-email">Email</Label>
+                                        <Input id="edit-email" type="email" {...registerEditUser("email")} />
+                                        {editUserErrors.email && <p className="text-sm text-destructive">{editUserErrors.email.message}</p>}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="edit-role">Role</Label>
+                                        <div className="flex gap-2">
+                                            {['admin', 'manager', 'staff'].map(role => (
+                                                <label key={role} className="flex items-center gap-2 cursor-pointer border p-2 rounded hover:bg-muted">
+                                                    <input type="radio" value={role} {...registerEditUser("role")} />
+                                                    <span className="capitalize">{role}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Assigned Stores</Label>
+                                        <div className="border rounded-md p-3 space-y-2 max-h-[150px] overflow-y-auto">
+                                            {availableOrgs.map(org => (
+                                                <label key={org.id} className="flex items-center gap-2 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        value={org.id}
+                                                        {...registerEditUser("target_org_ids")}
+                                                        className="rounded border-gray-300 text-primary focus:ring-primary"
+                                                    />
+                                                    <span className="text-sm">{org.name}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">Select stores this user can access.</p>
+                                    </div>
+                                    <DialogFooter>
+                                        <Button type="button" variant="outline" onClick={() => setIsEditUserOpen(false)}>Cancel</Button>
+                                        <Button type="submit" disabled={loadingUsers}>
+                                            {loadingUsers && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                            Save Changes
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+
+                    <div className="border rounded-md">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>User</TableHead>
+                                    <TableHead>Role</TableHead>
+                                    <TableHead>Stores</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {loadingUsers ? (
                                     <TableRow>
-                                        <TableHead>User</TableHead>
-                                        <TableHead>Role</TableHead>
-                                        <TableHead>Stores</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                        <TableCell colSpan={4} className="text-center py-8">
+                                            <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                                        </TableCell>
                                     </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {loadingUsers ? (
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="text-center py-8">
-                                                <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                                ) : users.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                                            No users found.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    users.map((u) => (
+                                        <TableRow key={u.id}>
+                                            <TableCell className="font-medium">
+                                                <div className="flex flex-col">
+                                                    <span className="font-semibold text-gray-900">
+                                                        {u.first_name || ""} {u.last_name || ""}
+                                                    </span>
+                                                    <span className="text-sm text-gray-500">{u.email}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                {u.roles.map(r => (
+                                                    <span key={r} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                                                        {r}
+                                                    </span>
+                                                ))}
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {u.stores && u.stores.length > 0 ? u.stores.map(s => (
+                                                        <span key={s.id} className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-700">
+                                                            {s.name}
+                                                        </span>
+                                                    )) : <span className="text-xs text-muted-foreground">None</span>}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => openEditUser(u)}
+                                                    >
+                                                        <Pencil className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="text-destructive hover:text-destructive"
+                                                        onClick={() => handleDeleteUser(u.id)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
-                                    ) : users.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                                                No users found.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        users.map((u) => (
-                                            <TableRow key={u.id}>
-                                                <TableCell className="font-medium">
-                                                    <div className="flex flex-col">
-                                                        <span className="font-semibold text-gray-900">
-                                                            {u.first_name || ""} {u.last_name || ""}
-                                                        </span>
-                                                        <span className="text-sm text-gray-500">{u.email}</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {u.roles.map(r => (
-                                                        <span key={r} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
-                                                            {r}
-                                                        </span>
-                                                    ))}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {u.stores && u.stores.length > 0 ? u.stores.map(s => (
-                                                            <span key={s.id} className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-700">
-                                                                {s.name}
-                                                            </span>
-                                                        )) : <span className="text-xs text-muted-foreground">None</span>}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <div className="flex justify-end gap-2">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() => openEditUser(u)}
-                                                        >
-                                                            <Pencil className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="text-destructive hover:text-destructive"
-                                                            onClick={() => handleDeleteUser(u.id)}
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </TabsContent>
-                )}
-            </Tabs>
-        </div>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </TabsContent>
+            )}
+        </Tabs>
+        </div >
     );
 }
