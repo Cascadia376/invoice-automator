@@ -10,6 +10,7 @@ import logging
 from cachetools import TTLCache, cached
 from jwt import decode, algorithms
 from jwt.algorithms import RSAAlgorithm
+from database import get_db
 
 # Setup logging
 logger = logging.getLogger("auth")
@@ -193,7 +194,7 @@ def _context_from_payload(payload: dict) -> UserContext:
     email = payload.get("email") or payload.get("user_metadata", {}).get("email")
     return UserContext(user_id=user_id, org_id=org_id, email=email)
 
-from database import get_db
+
 
 from typing import Set, Union
 
