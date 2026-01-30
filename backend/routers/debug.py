@@ -173,3 +173,50 @@ def bootstrap_admin_role(
     except Exception as e:
         import traceback
         return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
+
+@router.get("/api/debug/org-context")
+def debug_org_context(
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """
+    Diagnostic endpoint to show:
+    - Current user's organization context
+    - All unique organization_ids in invoices table
+    - Count of invoices per organization
+    """
+    from sqlalchemy import func
+    
+    # Get invoice counts by organization
+    org_counts = db.query(
+        models.Invoice.organization_id,
+        func.count(models.Invoice.id).label('count')
+    ).group_by(models.Invoice.organization_id).all()
+    
+    # Get user roles
+    user_roles = db.query(models.UserRole).filter(
+        models.UserRole.user_id == ctx.user_id
+    ).all()
+    
+    return {
+        "current_context": {
+            "user_id": ctx.user_id,
+            "org_id": ctx.org_id,
+            "email": ctx.email
+        },
+        "invoice_organizations": [
+            {"organization_id": org_id, "invoice_count": count}
+            for org_id, count in org_counts
+        ],
+        "user_roles": [
+            {
+                "organization_id": role.organization_id,
+                "role_id": role.role_id
+            }
+            for role in user_roles
+        ],
+        "diagnosis": {
+            "message": "If your org_id doesn't match any invoice organization_id, that's why you can't see invoices",
+            "suggestion": "Check if invoices need to be migrated to the correct organization_id"
+        }
+    }
