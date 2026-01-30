@@ -6,14 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/use-toast";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import {
     Dialog,
     DialogContent,
@@ -24,13 +19,21 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Loader2, Shield, Activity } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Shield, Activity, Globe, MapPin, ToggleLeft, ToggleRight, Settings2, Save } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -78,6 +81,10 @@ interface User {
 interface Organization {
     id: string;
     name: string;
+    stellar_tenant?: string;
+    stellar_location_id?: string;
+    stellar_location_name?: string;
+    stellar_enabled?: boolean;
 }
 
 export default function Settings() {
@@ -353,6 +360,77 @@ export default function Settings() {
         localStorage.setItem("csv_export_columns", JSON.stringify(newColumns));
     };
 
+    // POS Integration State
+    const [updatingOrg, setUpdatingOrg] = useState<string | null>(null);
+
+    const handleUpdateOrg = async (orgId: string, updates: Partial<Organization>) => {
+        setUpdatingOrg(orgId);
+        try {
+            const token = await getToken();
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/admin/organizations/${orgId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify(updates)
+            });
+
+            if (res.ok) {
+                await fetchOrgs();
+            } else {
+                alert("Failed to update organization");
+            }
+        } catch (e) {
+            console.error("Error updating organization", e);
+        } finally {
+            setUpdatingOrg(null);
+        }
+    };
+
+    const [bulkJson, setBulkJson] = useState('');
+    const [isImporting, setIsImporting] = useState(false);
+
+    const handleBulkImport = async () => {
+        if (!bulkJson.trim()) return;
+        setIsImporting(true);
+        try {
+            const token = await getToken();
+            const data = JSON.parse(bulkJson);
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/stellar/bulk-import`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                toast({
+                    title: "Import successful",
+                    description: "Global vendor mappings have been updated.",
+                });
+                setBulkJson('');
+            } else {
+                toast({
+                    title: "Import failed",
+                    description: "Please check your JSON format.",
+                    variant: "destructive"
+                });
+            }
+        } catch (e) {
+            console.error("Bulk import failed", e);
+            toast({
+                title: "Invalid JSON",
+                description: "Ensure the data is a valid JSON array of mappings.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
     return (
         <div className="space-y-8">
             <div>
@@ -366,6 +444,7 @@ export default function Settings() {
                 <TabsList>
                     <TabsTrigger value="general">General</TabsTrigger>
                     {isAdmin && <TabsTrigger value="team">Team & Roles</TabsTrigger>}
+                    {isAdmin && <TabsTrigger value="pos">POS Integration</TabsTrigger>}
                 </TabsList>
 
                 <TabsContent value="general" className="space-y-8 mt-4">
@@ -796,6 +875,136 @@ export default function Settings() {
                                 </TableBody>
                             </Table>
                         </div>
+                    </TabsContent>
+                )}
+
+                {isAdmin && (
+                    <TabsContent value="pos" className="space-y-6 mt-4">
+                        <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg flex gap-4">
+                            <div className="p-2 bg-blue-100 rounded-full h-fit">
+                                <Settings2 className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-blue-900">Stellar POS Integration</h3>
+                                <p className="text-sm text-blue-800/70">
+                                    Configure store-level overrides for Stellar POS. These settings will override environment variables
+                                    to support multiple accounts or locations.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="border rounded-md bg-white">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Store Name</TableHead>
+                                        <TableHead>Stellar Tenant</TableHead>
+                                        <TableHead>Location GUID (Warehouse)</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {availableOrgs.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                                No stores found.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        availableOrgs.map((org) => (
+                                            <TableRow key={org.id} className="group">
+                                                <TableCell className="font-medium">{org.name}</TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        defaultValue={org.stellar_tenant || ''}
+                                                        className="h-8 max-w-[150px] font-mono text-xs"
+                                                        placeholder="e.g. cascadiabc"
+                                                        onBlur={(e) => {
+                                                            if (e.target.value !== org.stellar_tenant) {
+                                                                handleUpdateOrg(org.id, { stellar_tenant: e.target.value });
+                                                            }
+                                                        }}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        defaultValue={org.stellar_location_id || ''}
+                                                        className="h-8 max-w-[320px] font-mono text-xs"
+                                                        placeholder="6552c5eb-..."
+                                                        onBlur={(e) => {
+                                                            if (e.target.value !== org.stellar_location_id) {
+                                                                handleUpdateOrg(org.id, { stellar_location_id: e.target.value });
+                                                            }
+                                                        }}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className={`flex items-center gap-2 ${org.stellar_enabled ? 'text-green-600' : 'text-muted-foreground'}`}
+                                                        onClick={() => handleUpdateOrg(org.id, { stellar_enabled: !org.stellar_enabled })}
+                                                    >
+                                                        {org.stellar_enabled ? (
+                                                            <>
+                                                                <ToggleRight className="w-5 h-5" />
+                                                                Active
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <ToggleLeft className="w-5 h-5" />
+                                                                Disabled
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {updatingOrg === org.id && (
+                                                        <Loader2 className="w-4 h-4 animate-spin ml-auto" />
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+
+                        <Card className="mt-8 border-amber-100 bg-amber-50/20">
+                            <CardHeader>
+                                <div className="flex items-center gap-2">
+                                    <Globe className="w-5 h-5 text-amber-600" />
+                                    <CardTitle className="text-lg text-amber-900">Global Supplier Registry</CardTitle>
+                                </div>
+                                <CardDescription className="text-amber-800/70">
+                                    Pre-populate the global registry to help all stores discover supplier IDs automatically.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-amber-900">PASTE JSON MAPPINGS</Label>
+                                    <Textarea
+                                        placeholder='[{"vendor_name": "Sysco", "stellar_supplier_id": "...", "stellar_supplier_name": "SYSCO CANADA"}]'
+                                        className="font-mono text-[10px] min-h-[120px] bg-white border-amber-200"
+                                        value={bulkJson}
+                                        onChange={(e) => setBulkJson(e.target.value)}
+                                    />
+                                    <p className="text-[10px] text-amber-700/70 italic">
+                                        Note: This updates the shared registry used for suggestions across the entire platform.
+                                    </p>
+                                </div>
+                                <Button
+                                    className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+                                    size="sm"
+                                    onClick={handleBulkImport}
+                                    disabled={isImporting || !bulkJson.trim()}
+                                >
+                                    {isImporting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                                    Bulk Import Mappings
+                                </Button>
+                            </CardContent>
+                        </Card>
                     </TabsContent>
                 )}
             </Tabs>

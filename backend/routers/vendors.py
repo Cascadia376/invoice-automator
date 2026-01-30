@@ -38,6 +38,8 @@ def list_vendors(
             "notes": vendor.notes,
             "created_at": vendor.created_at,
             "updated_at": vendor.updated_at,
+            "stellar_supplier_id": vendor.stellar_supplier_id,
+            "stellar_supplier_name": vendor.stellar_supplier_name,
             **stats
         }
         vendor_list.append(vendor_dict)
@@ -71,6 +73,8 @@ def get_vendor(
         "notes": vendor.notes,
         "created_at": vendor.created_at,
         "updated_at": vendor.updated_at,
+        "stellar_supplier_id": vendor.stellar_supplier_id,
+        "stellar_supplier_name": vendor.stellar_supplier_name,
         **stats
     }
 
@@ -123,9 +127,39 @@ def update_vendor(
     if vendor_update.notes is not None:
         db_vendor.notes = vendor_update.notes
     
+    # Stellar POS integration fields
+    if vendor_update.stellar_supplier_id is not None:
+        db_vendor.stellar_supplier_id = vendor_update.stellar_supplier_id
+    if vendor_update.stellar_supplier_name is not None:
+        db_vendor.stellar_supplier_name = vendor_update.stellar_supplier_name
+    
     db_vendor.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(db_vendor)
+    
+    # Automatically contribute to Global Registry if Stellar IDs are provided
+    if db_vendor.stellar_supplier_id and db_vendor.stellar_supplier_name:
+        try:
+            existing_global = db.query(models.GlobalVendorMapping).filter(
+                models.GlobalVendorMapping.vendor_name == db_vendor.name
+            ).first()
+            
+            if existing_global:
+                existing_global.stellar_supplier_id = db_vendor.stellar_supplier_id
+                existing_global.stellar_supplier_name = db_vendor.stellar_supplier_name
+                existing_global.updated_at = datetime.utcnow()
+            else:
+                new_global = models.GlobalVendorMapping(
+                    id=str(uuid.uuid4()),
+                    vendor_name=db_vendor.name,
+                    stellar_supplier_id=db_vendor.stellar_supplier_id,
+                    stellar_supplier_name=db_vendor.stellar_supplier_name
+                )
+                db.add(new_global)
+            db.commit()
+        except Exception as e:
+            print(f"Failed to auto-contribute to global registry: {e}")
+            db.rollback()
     
     return db_vendor
 

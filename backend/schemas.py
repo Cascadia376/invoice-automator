@@ -58,6 +58,11 @@ class InvoiceBase(BaseModel):
     file_url: Optional[str] = None
     issue_type: Optional[str] = None
     is_posted: bool = False
+    
+    # Stellar POS integration fields
+    stellar_posted_at: Optional[datetime] = None
+    stellar_asn_number: Optional[str] = None
+    stellar_response: Optional[str] = None
 
     @validator('invoice_number', 'vendor_name', pre=True, check_fields=False)
     def ensure_string(cls, v):
@@ -89,6 +94,12 @@ class InvoiceUpdate(BaseModel):
     deposit_amount: Optional[float] = None
     issue_type: Optional[str] = None
     is_posted: Optional[bool] = None
+    
+    # Stellar POS integration fields
+    stellar_posted_at: Optional[datetime] = None
+    stellar_asn_number: Optional[str] = None
+    stellar_response: Optional[str] = None
+    
     line_items: Optional[List[LineItemBase]] = None
 
     class Config:
@@ -158,8 +169,25 @@ class StoreSchema(BaseModel):
     id: str
     name: str
     
+    # Stellar POS integration fields
+    stellar_tenant: Optional[str] = None
+    stellar_location_id: Optional[str] = None
+    stellar_location_name: Optional[str] = None
+    stellar_enabled: bool = False
+    
     model_config = {
         "from_attributes": True,
+        "populate_by_name": True
+    }
+
+class StoreUpdate(BaseModel):
+    name: Optional[str] = None
+    stellar_tenant: Optional[str] = None
+    stellar_location_id: Optional[str] = None
+    stellar_location_name: Optional[str] = None
+    stellar_enabled: Optional[bool] = None
+    
+    model_config = {
         "populate_by_name": True
     }
 
@@ -186,6 +214,10 @@ class VendorBase(BaseModel):
     default_gl_category: Optional[str] = None
     notes: Optional[str] = None
 
+    # Stellar POS integration fields
+    stellar_supplier_id: Optional[str] = None
+    stellar_supplier_name: Optional[str] = None
+
 class VendorCreate(VendorBase):
     pass
 
@@ -194,6 +226,10 @@ class VendorUpdate(BaseModel):
     aliases: Optional[List[str]] = None
     default_gl_category: Optional[str] = None
     notes: Optional[str] = None
+    
+    # Stellar POS integration fields
+    stellar_supplier_id: Optional[str] = None
+    stellar_supplier_name: Optional[str] = None
 
 class Vendor(VendorBase):
     id: str
@@ -208,6 +244,24 @@ class VendorWithStats(Vendor):
     correction_count: int = 0
     last_invoice_date: Optional[str] = None
     accuracy_rate: float = 1.0
+
+# Global Vendor Mapping Schemas
+class GlobalVendorMappingBase(BaseModel):
+    vendor_name: str
+    stellar_supplier_id: str
+    stellar_supplier_name: str
+    confidence_score: float = 1.0
+
+class GlobalVendorMappingCreate(GlobalVendorMappingBase):
+    pass
+
+class GlobalVendorMapping(GlobalVendorMappingBase):
+    id: str
+    usage_count: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
 
 # Issue Schemas
 class IssueCommunicationBase(BaseModel):

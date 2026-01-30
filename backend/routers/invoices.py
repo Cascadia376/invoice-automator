@@ -390,11 +390,21 @@ def delete_invoice(
     return {"status": "success", "message": "Invoice deleted"}
 
 @router.patch("/{invoice_id}/post", response_model=schemas.Invoice)
-def post_invoice_to_pos(
+async def post_invoice_to_pos(
     invoice_id: str,
     db: Session = Depends(get_db),
     ctx: auth.UserContext = Depends(auth.get_current_user)
 ):
+    """
+    Post an invoice to POS system (Stellar).
+    
+    This endpoint:
+    1. Marks the invoice as posted in our system
+    2. Attempts to post to Stellar if configured for the vendor
+    3. Returns the updated invoice with Stellar posting status
+    """
+    from services import stellar_service
+    
     db_invoice = db.query(models.Invoice).filter(
         models.Invoice.id == invoice_id,
         models.Invoice.organization_id == ctx.org_id
@@ -402,14 +412,40 @@ def post_invoice_to_pos(
     if db_invoice is None:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
+    # Mark as posted in our system
     db_invoice.is_posted = True
+    
+    # Attempt to post to Stellar if configured
+    stellar_result = None
+    stellar_error = None
+    
+    try:
+        stellar_result = await stellar_service.post_invoice_if_configured(db_invoice, db)
+        if stellar_result:
+            logger.info(f"Successfully posted invoice {invoice_id} to Stellar")
+    except stellar_service.StellarError as e:
+        # Log the error but don't fail the entire request
+        # The invoice is still marked as posted in our system
+        stellar_error = str(e)
+        logger.error(f"Failed to post invoice {invoice_id} to Stellar: {stellar_error}")
+    except Exception as e:
+        stellar_error = f"Unexpected error: {str(e)}"
+        logger.exception(f"Unexpected error posting invoice {invoice_id} to Stellar")
+    
     db.commit()
     db.refresh(db_invoice)
     
+    # Normalize file URL for response
     if db_invoice.file_url:
          db_invoice.file_url = f"/api/invoices/{db_invoice.id}/file"
+    
+    # Add Stellar status to response (not in schema, but useful for debugging)
+    response_data = db_invoice
+    if stellar_error:
+        # Could add this to a response header or log it
+        logger.warning(f"Invoice {invoice_id} posted locally but Stellar sync failed: {stellar_error}")
          
-    return db_invoice
+    return response_data
 
 @router.patch("/bulk-post")
 def bulk_post_invoices(

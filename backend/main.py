@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 import os
 import traceback
 import models, database
-from routers import invoices, vendors, gl_categories, debug, issues, admin, auth_router
+from routers import invoices, vendors, gl_categories, debug, issues, admin, auth_router, stellar
 import auth
 
 models.Base.metadata.create_all(bind=database.engine)
@@ -47,29 +47,23 @@ async def global_exception_handler(request: Request, exc: Exception):
         response.headers["Access-Control-Allow-Headers"] = "*"
     return response
 
-# Use absolute path for any remaining local temp needs
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
 # Include Routers
 app.include_router(invoices.router)
 app.include_router(vendors.router)
 app.include_router(gl_categories.router)
 app.include_router(issues.router)
 app.include_router(admin.router)
+app.include_router(stellar.router)
 app.include_router(debug.router)
 app.include_router(auth_router.router)
 
 @app.get("/")
-@app.get("/health")
 @app.get("/api/health")
 def health_check():
-    from database import SQLALCHEMY_DATABASE_URL
-    db_type = "postgres" if "postgres" in SQLALCHEMY_DATABASE_URL else "sqlite"
-    
     return {
         "status": "ok", 
         "version": "1.1.0",
-        "database": db_type,
+        "database": "postgres",
         "auth_required": auth.AUTH_REQUIRED,
         "supabase_url": bool(auth.SUPABASE_URL),
         "supabase_jwt_secret_present": bool(auth.SUPABASE_JWT_SECRET),

@@ -85,7 +85,43 @@ def list_all_organizations(
     """List ALL organizations (Stores) in the system"""
     stores = db.query(models.Store).all()
     # Map store_id (int) to id (str) for frontend
-    return [{"id": str(s.store_id), "name": s.name} for s in stores]
+    return [{"id": str(s.store_id), "name": s.name, 
+             "stellar_tenant": s.stellar_tenant,
+             "stellar_location_id": s.stellar_location_id,
+             "stellar_location_name": s.stellar_location_name,
+             "stellar_enabled": s.stellar_enabled} for s in stores]
+
+@router.put("/admin/organizations/{org_id}", dependencies=[Depends(auth.require_role("admin"))])
+def update_organization(
+    org_id: str,
+    store_update: schemas.StoreUpdate,
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """Update organization (Store) details"""
+    try:
+        store_id_int = int(org_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid organization ID format")
+
+    db_store = db.query(models.Store).filter(models.Store.store_id == store_id_int).first()
+    if not db_store:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    if store_update.name is not None:
+        db_store.name = store_update.name
+    if store_update.stellar_tenant is not None:
+        db_store.stellar_tenant = store_update.stellar_tenant
+    if store_update.stellar_location_id is not None:
+        db_store.stellar_location_id = store_update.stellar_location_id
+    if store_update.stellar_location_name is not None:
+        db_store.stellar_location_name = store_update.stellar_location_name
+    if store_update.stellar_enabled is not None:
+        db_store.stellar_enabled = store_update.stellar_enabled
+
+    db.commit()
+    db.refresh(db_store)
+    return {"status": "success"}
 
 @router.get("/admin/users", dependencies=[Depends(auth.require_role("admin"))], response_model=List[schemas.UserResponse])
 def list_users(

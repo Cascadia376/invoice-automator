@@ -25,4 +25,10 @@ services:
         sync: false # Required for fetching RS256 signing keys automatically
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false # Required for admin operations (inviting users)
+      - key: STELLAR_API_TOKEN
+        sync: false # Stellar POS API authentication token
+      - key: STELLAR_TENANT_ID
+        sync: false # Stellar tenant identifier
+      - key: STELLAR_LOCATION_ID
+        sync: false # Stellar location UUID
     autoDeploy: true

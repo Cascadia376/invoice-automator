@@ -29,6 +29,12 @@ class Invoice(Base):
     ldb_report_url = Column(String, nullable=True) # URL/Key to the last generated LDB report
     vendor_id = Column(String, ForeignKey("vendors.id"), nullable=True)
     is_posted = Column(Boolean, default=False)
+    
+    # Stellar POS integration fields
+    stellar_posted_at = Column(DateTime, nullable=True)
+    stellar_asn_number = Column(String, nullable=True, index=True)
+    stellar_response = Column(String, nullable=True)
+    
     created_at = Column(DateTime, default=datetime.utcnow)
 
     line_items = relationship("LineItem", back_populates="invoice", cascade="all, delete-orphan")
@@ -94,6 +100,12 @@ class Store(Base):
     organization_id = Column(String, nullable=True)
     access_code = Column(String, nullable=True)
     status = Column(String, default="active")
+    
+    # Stellar POS integration fields
+    stellar_tenant = Column(String, nullable=True)
+    stellar_location_id = Column(String, nullable=True)
+    stellar_location_name = Column(String, nullable=True)
+    stellar_enabled = Column(Boolean, default=False)
 
 class Vendor(Base):
     """Vendor profile with learned patterns"""
@@ -105,6 +117,11 @@ class Vendor(Base):
     aliases = Column(String, nullable=True)  # JSON array of alternative names
     default_gl_category = Column(String, nullable=True)
     notes = Column(String, nullable=True)
+    
+    # Stellar POS integration fields
+    stellar_supplier_id = Column(String, nullable=True)  # UUID in Stellar system
+    stellar_supplier_name = Column(String, nullable=True)  # Supplier name as registered in Stellar
+    
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -120,6 +137,19 @@ class VendorFieldMapping(Base):
     confidence = Column(Float, default=1.0)  # How often this mapping is correct
     usage_count = Column(Integer, default=1)
     last_used = Column(DateTime, default=datetime.utcnow)
+
+class GlobalVendorMapping(Base):
+    """Shared registry of vendor names mapped to Stellar IDs"""
+    __tablename__ = "global_vendor_mappings"
+
+    id = Column(String, primary_key=True, index=True)
+    vendor_name = Column(String, unique=True, index=True, nullable=False)
+    stellar_supplier_id = Column(String, nullable=False)
+    stellar_supplier_name = Column(String, nullable=False)
+    confidence_score = Column(Float, default=1.0)
+    usage_count = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class VendorCorrection(Base):
     """Track user corrections for learning"""

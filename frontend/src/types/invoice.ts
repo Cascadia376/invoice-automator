@@ -31,6 +31,9 @@ export interface Invoice {
   currency: string;
   poNumber?: string;
   isPosted: boolean;
+  stellarPostedAt?: string;
+  stellarAsnNumber?: string;
+  stellarResponse?: string;
   status: InvoiceStatus;
   lineItems: LineItem[];
   issues?: Issue[];

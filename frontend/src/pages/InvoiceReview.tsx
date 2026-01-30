@@ -14,6 +14,7 @@ import {
   FileText,
   FileDown,
   CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
 import {
   ResizableHandle,
@@ -37,6 +38,7 @@ export default function InvoiceReview() {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [isPdfVisible, setIsPdfVisible] = useState(true);
   const { saveDraft, getDraft, clearDraft, hasDraft } = useLocalDraft();
+  const [isPosting, setIsPosting] = useState(false);
 
   // Highlight State
   const [highlights, setHighlights] = useState<Record<string, any[]>>({});
@@ -215,6 +217,7 @@ export default function InvoiceReview() {
 
   const handlePostToPos = async () => {
     if (!invoice) return;
+    setIsPosting(true);
     try {
       const token = await getToken();
       const response = await fetch(`${API_BASE}/api/invoices/${invoice.id}/post`, {
@@ -222,14 +225,22 @@ export default function InvoiceReview() {
         headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
       });
 
-      if (!response.ok) throw new Error("Failed to post to POS");
+      const result = await response.json();
 
-      const updatedInvoice = await response.json();
-      setInvoice(updatedInvoice);
-      toast.success("Invoice marked as Posted in POS");
-    } catch (error) {
+      if (!response.ok) {
+        setInvoice(prev => prev ? { ...prev, stellarResponse: result.detail || result.error || "Post failed" } : undefined);
+        throw new Error(result.detail || "Failed to post to POS");
+      }
+
+      setInvoice(result);
+      toast.success("Invoice successfully posted to Stellar POS", {
+        description: `ASN: ${result.stellarAsnNumber}`,
+      });
+    } catch (error: any) {
       console.error(error);
-      toast.error("Failed to mark as posted");
+      toast.error(error.message || "Failed to post to Stellar POS");
+    } finally {
+      setIsPosting(false);
     }
   };
 
@@ -531,18 +542,32 @@ export default function InvoiceReview() {
                   {invoice.status === 'approved' && !invoice.isPosted && (
                     <button
                       onClick={handlePostToPos}
-                      className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      disabled={isPosting}
+                      className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       type="button"
                     >
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      <span>Post to POS</span>
+                      {isPosting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                      <span>{isPosting ? 'Posting to Stellar...' : 'Post to Stellar'}</span>
                     </button>
                   )}
 
                   {invoice.isPosted && (
-                    <div className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-blue-700 bg-blue-50 rounded-lg border border-blue-200">
-                      <CheckCircle2 className="h-4 w-4" />
-                      Posted in POS
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-green-700 bg-green-50 rounded-lg border border-green-200 shadow-sm">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Posted to Stellar
+                      </div>
+                      <div className="flex flex-col items-end text-[10px] text-muted-foreground font-mono leading-tight pr-1">
+                        {invoice.stellarAsnNumber && <span>ASN: {invoice.stellarAsnNumber}</span>}
+                        {invoice.stellarPostedAt && <span>{new Date(invoice.stellarPostedAt).toLocaleString()}</span>}
+                      </div>
+                    </div>
+                  )}
+
+                  {invoice.stellarResponse && !invoice.isPosted && (
+                    <div className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-lg border border-red-200 mt-2 max-w-md">
+                      <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate" title={invoice.stellarResponse}>Stellar Error: {invoice.stellarResponse}</span>
                     </div>
                   )}
                 </div>
