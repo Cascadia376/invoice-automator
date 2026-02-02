@@ -14,13 +14,16 @@ def verify_sync():
     # Count Invoices
     resp = requests.get(
         f"{SUPABASE_URL}/rest/v1/supplier_invoices?select=count",
-        headers={**HEADERS, "Range-Unit": "items"},
+        headers={**HEADERS, "Range-Unit": "items", "Prefer": "count=exact"},
     )
     
     # Range-Unit: items
     # Content-Range: 0-0/44  <-- Total is 44
     content_range = resp.headers.get("Content-Range", "0-0/0")
-    total_invoices = content_range.split("/")[-1]
+    try:
+        total_invoices = content_range.split("/")[-1]
+    except:
+        total_invoices = "Unknown"
     
     print(f"Total Invoices in Database: {total_invoices}")
 

@@ -31,6 +31,15 @@ def sync_invoices():
     fail_count = 0
     
     for fpath in files:
+        # Optimization: Skip already synced lower IDs
+        try:
+            filename = os.path.basename(fpath)
+            file_id_str = filename.replace("SUPL-INV-2026-", "").replace(".json", "")
+            if int(file_id_str) <= 17666:
+                continue
+        except:
+             pass # Process normally if format differs
+
         try:
             with open(fpath, 'r', encoding='utf-8') as f:
                 data = json.load(f)
