@@ -8,6 +8,7 @@ import uuid
 import csv
 import io
 import fitz # PyMuPDF
+import tempfile
 
 import models, schemas, auth
 from database import get_db
@@ -33,7 +34,8 @@ async def upload_invoice(
     try:
         file_id = str(uuid.uuid4())
         file_ext = os.path.splitext(file.filename)[1].lower()
-        original_temp_path = f"/tmp/original_{file_id}{file_ext}"
+        temp_dir = tempfile.gettempdir()
+        original_temp_path = os.path.join(temp_dir, f"original_{file_id}{file_ext}")
         
         with open(original_temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
@@ -146,7 +148,7 @@ async def upload_invoice(
         # Cleanup temp files if they are splits
         if len(files_to_process) > 1:
             for p in files_to_process:
-                if os.path.exists(p) and "/tmp/splits" in p:
+                if os.path.exists(p) and "splits" in p:
                     os.remove(p)
         if os.path.exists(original_temp_path):
             os.remove(original_temp_path)
@@ -533,7 +535,8 @@ def submit_feedback(
     
     # 1. Trigger legacy template refinement in background
     if s3_key and not s3_key.startswith("http"):
-        temp_file_path = f"/tmp/feedback_{invoice_id}.pdf"
+        temp_dir = tempfile.gettempdir()
+        temp_file_path = os.path.join(temp_dir, f"feedback_{invoice_id}.pdf")
         storage.download_file(s3_key, temp_file_path)
         
         background_tasks.add_task(
@@ -610,7 +613,8 @@ def get_invoice_highlights(
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     s3_key = invoice.file_url
-    temp_file_path = f"/tmp/highlights_{invoice_id}.pdf"
+    temp_dir = tempfile.gettempdir()
+    temp_file_path = os.path.join(temp_dir, f"highlights_{invoice_id}.pdf")
     
     try:
         if s3_key and not s3_key.startswith("http") and not os.path.exists(s3_key):

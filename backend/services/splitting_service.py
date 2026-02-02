@@ -5,6 +5,7 @@ import uuid
 import shutil
 from openai import OpenAI
 from typing import List, Dict, Any
+import tempfile
 
 def detect_invoice_boundaries(file_path: str) -> List[Dict[str, Any]]:
     """
@@ -101,7 +102,7 @@ def split_pdf_into_files(original_file_path: str, ranges: List[Dict[str, Any]]) 
             new_doc.insert_pdf(doc, from_page=start, to_page=end)
             
             # Save to temporary path
-            temp_dir = "/tmp/splits"
+            temp_dir = os.path.join(tempfile.gettempdir(), "splits")
             os.makedirs(temp_dir, exist_ok=True)
             
             file_id = str(uuid.uuid4())

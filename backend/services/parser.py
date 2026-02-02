@@ -13,6 +13,7 @@ from invoice2data.extract.loader import read_templates
 from database import SessionLocal
 import models
 from services import textract_service
+import tempfile
 
 def normalize_currency(currency: str) -> str:
     """Always return CAD for this implementation."""
@@ -458,7 +459,7 @@ def get_templates_from_db(org_id: str):
         db_templates = db.query(models.Template).filter(models.Template.organization_id == org_id).all()
         
         # Create temp dir for invoice2data
-        temp_dir = '/tmp/invoice_templates'
+        temp_dir = os.path.join(tempfile.gettempdir(), 'invoice_templates')
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
         os.makedirs(temp_dir)
