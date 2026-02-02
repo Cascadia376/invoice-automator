@@ -45,6 +45,7 @@ async def upload_invoice(
             shutil.copyfileobj(file.file, buffer)
             
         # 1. Decide if splitting is needed (only for PDFs)
+        print("STAGE 1: Checking for multi-invoice content...")
         files_to_process = []
         if file_ext == ".pdf":
             print(f"DEBUG: Checking for multi-invoice content in {file.filename}")
@@ -62,15 +63,18 @@ async def upload_invoice(
         created_invoices = []
 
         # 2. Process each file
-        for current_file_path in files_to_process:
+        for i, current_file_path in enumerate(files_to_process):
+            print(f"STAGE 2.{i+1}: Processing file {i+1}/{len(files_to_process)}: {current_file_path}")
             current_file_id = str(uuid.uuid4())
             current_ext = os.path.splitext(current_file_path)[1]
             
             # Upload to S3
             s3_key = f"invoices/{ctx.org_id}/{current_file_id}{current_ext}"
+            print(f"STAGE 2.{i+1}.1: Uploading to S3: {s3_key}")
             storage.upload_file(current_file_path, s3_key)
             
             # Parse File
+            print(f"STAGE 2.{i+1}.2: Parsing file...")
             if current_ext.lower() == ".xlsx":
                  extracted_data = ldb_parser.parse_ldb_xlsx(current_file_path)
                  extracted_data["vendor_name"] = "LDB"
@@ -78,10 +82,12 @@ async def upload_invoice(
                  s3_bucket = os.getenv("AWS_BUCKET_NAME", "swift-invoice-zen-uploads")
                  extracted_data = parser.extract_invoice_data(current_file_path, ctx.org_id, s3_key=s3_key, s3_bucket=s3_bucket)
             
+            print(f"STAGE 2.{i+1}.3: Vendor handling...")
             vendor_name = extracted_data.get("vendor_name", "Unknown Vendor")
             vendor = vendor_service.get_or_create_vendor(db, vendor_name, ctx.org_id)
             extracted_data = vendor_service.apply_vendor_corrections(db, extracted_data, vendor)
             
+            print(f"STAGE 2.{i+1}.4: Item validation...")
             for item in extracted_data.get("line_items", []):
                 validation = product_service.validate_item_against_master(db, ctx.org_id, item)
                 if validation["status"] == "success" and validation["flags"]:
@@ -89,6 +95,7 @@ async def upload_invoice(
                         item["category_gl_code"] = validation["master_category"]
             
             # Create DB Entry
+            print(f"STAGE 2.{i+1}.5: Creating DB entries...")
             db_invoice = models.Invoice(
                 id=current_file_id,
                 organization_id=ctx.org_id,
@@ -141,6 +148,7 @@ async def upload_invoice(
                 )
                 db_invoice.line_items.append(db_item)
             
+            print(f"STAGE 2.{i+1}.6: Committing to DB...")
             db.add(db_invoice)
             db.commit()
             db.refresh(db_invoice)

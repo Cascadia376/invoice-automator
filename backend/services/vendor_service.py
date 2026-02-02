@@ -70,6 +70,7 @@ def get_or_create_vendor(db: Session, vendor_name: str, org_id: str) -> models.V
     vendor = find_vendor_by_name(db, vendor_name, org_id)
     
     if vendor:
+        print(f"DEBUG: Found existing vendor: {vendor.name} (ID: {vendor.id})")
         return vendor
     
     # Create new vendor
@@ -98,23 +99,23 @@ def get_vendor_field_mappings(db: Session, vendor_id: str) -> Dict[str, str]:
 
 def apply_vendor_corrections(db: Session, invoice_data: Dict, vendor: models.Vendor) -> Dict:
     """Apply learned corrections to invoice data using raw results."""
-    # 1. Get field mappings for this vendor
-    mappings = get_vendor_field_mappings(db, vendor.id)
-    if not mappings:
-        return invoice_data
-        
-    # 2. Extract raw results if present
-    raw_results_str = invoice_data.get("raw_extraction_results")
-    if not raw_results_str:
-        return invoice_data
-        
     try:
+        # 1. Get field mappings for this vendor
+        mappings = get_vendor_field_mappings(db, vendor.id)
+        if not mappings:
+            return invoice_data
+            
+        print(f"DEBUG: Applying learned corrections for vendor {vendor.name} ({len(mappings)} mappings found)")
+            
+        # 2. Extract raw results if present
+        raw_results_str = invoice_data.get("raw_extraction_results")
+        if not raw_results_str:
+            return invoice_data
+            
         raw_data = json.loads(raw_results_str)
         
         # 3. Apply mappings
         for field_name, raw_field in mappings.items():
-            # If the field is already set (non-zero/non-null), maybe don't override?
-            # Actually, learned mappings should take precedence if they point to a specific value.
             if raw_field in raw_data:
                 learned_val = parse_float(raw_data[raw_field])
                 if learned_val != 0:
@@ -122,7 +123,9 @@ def apply_vendor_corrections(db: Session, invoice_data: Dict, vendor: models.Ven
                     invoice_data[field_name] = learned_val
                     
     except Exception as e:
-        print(f"Error applying vendor corrections: {e}")
+        print(f"ERROR: Failed to apply vendor corrections: {e}")
+        import traceback
+        traceback.print_exc()
         
     return invoice_data
 

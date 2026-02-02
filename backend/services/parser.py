@@ -42,20 +42,30 @@ def extract_invoice_data(file_path: str, org_id: str, s3_key: str = None, s3_buc
         templates = templates_data["templates"]
         temp_template_dir = templates_data["temp_dir"]
         
+        print(f"DEBUG: Loaded {len(templates)} templates for org {org_id}")
+        
         # invoice2data extraction
         result = extract_data(file_path, templates=templates)
         
         if result:
+            print(f"DEBUG: Template found match: {result.get('issuer', 'Unknown')}")
             # Check if we have meaningful data, especially line items
             mapped_result = map_to_schema(result)
             has_line_items = mapped_result.get('line_items') and len(mapped_result['line_items']) > 0
             
             if has_line_items:
-                print(f"Successfully extracted using template: {result.get('issuer', 'Unknown')}")
+                print(f"✅ Successfully extracted using template: {result.get('issuer', 'Unknown')}")
                 return mapped_result
             else:
-                print(f"Template matched but no line items found. Falling back to LLM.")
+                print(f"⚠️ Template matched but no line items found. Falling back to LLM.")
+        else:
+            print(f"DEBUG: No template matched for {file_path}")
             
+    except Exception as e:
+        print(f"ERROR: invoice2data extraction failed: {e}")
+        import traceback
+        traceback.print_exc()
+        
     finally:
         # Cleanup unique temp template dir
         if temp_template_dir and os.path.exists(temp_template_dir):
@@ -65,7 +75,7 @@ def extract_invoice_data(file_path: str, org_id: str, s3_key: str = None, s3_buc
                 pass
 
     # 2. Fallback to LLM (and learn)
-    print("No template matched or incomplete data. Falling back to LLM extraction and template generation...")
+    print("STAGE 2: Falling back to LLM extraction and template generation...")
     return extract_with_llm_and_learn(file_path, org_id, s3_key, s3_bucket)
 
 def extract_with_llm_and_learn(file_path: str, org_id: str, s3_key: str = None, s3_bucket: str = None):
@@ -470,11 +480,17 @@ def get_templates_from_db(org_id: str):
     
     try:
         db_templates = db.query(models.Template).filter(models.Template.organization_id == org_id).all()
+        print(f"DEBUG: Found {len(db_templates)} templates in DB for org {org_id}")
         
         os.makedirs(temp_dir, exist_ok=True)
         
         # Write DB templates to files
         for t in db_templates:
+            # SAFETY: Skip templates without vendor_name or content
+            if not t.vendor_name or not t.content:
+                print(f"WARNING: Skipping incomplete template {t.id} - Missing vendor_name or content")
+                continue
+                
             safe_name = re.sub(r'[^a-zA-Z0-9]', '_', t.vendor_name).lower()
             filename = f"{safe_name}_{t.id}.yml"
             with open(os.path.join(temp_dir, filename), 'w') as f:
@@ -489,7 +505,7 @@ def get_templates_from_db(org_id: str):
         
         return {"templates": read_templates(temp_dir), "temp_dir": temp_dir}
     except Exception as e:
-        print(f"Error loading templates from DB: {e}")
+        print(f"ERROR: loading templates from DB: {e}")
         return {"templates": [], "temp_dir": temp_dir}
     finally:
         db.close()
