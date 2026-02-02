@@ -55,21 +55,28 @@ try:
 except:
     pass
 
+from sqlalchemy.pool import NullPool
+
 # Pooling configuration for Render/Supabase stability
 # Use QueuePool with strict limits to prevent "Max client connections reached"
 # Default to 5 connections, with up to 10 overflow.
 pool_size = int(os.getenv("DB_POOL_SIZE", "5"))
 max_overflow = int(os.getenv("DB_MAX_OVERFLOW", "10"))
+use_null_pool = os.getenv("DB_POOL_DISABLE", "false").lower() == "true"
 
 engine_kwargs = {"connect_args": connect_args}
 
 if "postgresql" in SQLALCHEMY_DATABASE_URL:
-    engine_kwargs.update({
-        "pool_size": pool_size,
-        "max_overflow": max_overflow,
-        "pool_recycle": 300,  # Recycle connections every 5 minutes
-        "pool_pre_ping": True, # CPing connection before use (catch stale ones)
-    })
+    if use_null_pool:
+        engine_kwargs["poolclass"] = NullPool
+        print("DATABASE: Using NullPool (No connection pooling)")
+    else:
+        engine_kwargs.update({
+            "pool_size": pool_size,
+            "max_overflow": max_overflow,
+            "pool_recycle": 300,  # Recycle connections every 5 minutes
+            "pool_pre_ping": True, # CPing connection before use (catch stale ones)
+        })
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, **engine_kwargs

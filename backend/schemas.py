@@ -59,10 +59,10 @@ class InvoiceBase(BaseModel):
     issue_type: Optional[str] = None
     is_posted: bool = False
     
-    # Stellar POS integration fields
     stellar_posted_at: Optional[datetime] = None
     stellar_asn_number: Optional[str] = None
     stellar_response: Optional[str] = None
+    stellar_tenant: Optional[str] = None
 
     @validator('invoice_number', 'vendor_name', pre=True, check_fields=False)
     def ensure_string(cls, v):
@@ -95,10 +95,10 @@ class InvoiceUpdate(BaseModel):
     issue_type: Optional[str] = None
     is_posted: Optional[bool] = None
     
-    # Stellar POS integration fields
     stellar_posted_at: Optional[datetime] = None
     stellar_asn_number: Optional[str] = None
     stellar_response: Optional[str] = None
+    stellar_tenant: Optional[str] = None
     
     line_items: Optional[List[LineItemBase]] = None
 
@@ -261,6 +261,64 @@ class GlobalVendorMapping(GlobalVendorMappingBase):
     created_at: datetime
     updated_at: datetime
 
+    model_config = {"from_attributes": True}
+
+# Stellar Sync Schemas
+class SupplierInvoiceItemBase(BaseModel):
+    line_number: Optional[int] = None
+    sku: str
+    product_name: str
+    volume: Optional[str] = None
+    units_ordered: Optional[int] = None
+    received_quantity: Optional[float] = None
+    inventory_fill: Optional[int] = None
+    unit_cost: Optional[float] = None
+    avg_cost: Optional[float] = None
+    total_cost: Optional[float] = None
+    deposit_per_unit: Optional[float] = None
+    total_deposits: Optional[float] = None
+    taxes: Optional[float] = None
+    all_in_cost: Optional[float] = None
+    variance_quantity: Optional[float] = None
+    invoice_date: Optional[datetime] = None
+
+class SupplierInvoiceItem(SupplierInvoiceItemBase):
+    id: int
+    invoice_id: str
+    created_at: datetime
+    
+    model_config = {"from_attributes": True}
+
+class SupplierInvoiceBase(BaseModel):
+    invoice_id: str
+    supplier_name: str
+    supplier_invoice_number: str
+    original_po_number: Optional[str] = None
+    store_id: Optional[int] = None
+    store_name: Optional[str] = None
+    created_date: Optional[datetime] = None
+    date_received: Optional[datetime] = None
+    date_posted: Optional[datetime] = None
+    invoice_type: Optional[str] = None
+    tax_rate_name: Optional[str] = None
+    tax_rate: Optional[float] = None
+    shipping_cost: Optional[float] = None
+    total_products: Optional[int] = None
+    total_units: Optional[int] = None
+    sub_total: Optional[float] = None
+    total_deposits: Optional[float] = None
+    total_taxes: Optional[float] = None
+    non_taxable_items: Optional[float] = None
+    freight_fees: Optional[float] = None
+    credits_discounts: Optional[float] = None
+    invoice_total: Optional[float] = None
+    status: Optional[str] = None
+
+class SupplierInvoice(SupplierInvoiceBase):
+    id: int
+    created_at: datetime
+    items: List[SupplierInvoiceItem] = []
+    
     model_config = {"from_attributes": True}
 
 # Issue Schemas

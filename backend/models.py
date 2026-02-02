@@ -161,11 +161,65 @@ class VendorCorrection(Base):
     invoice_id = Column(String, ForeignKey("invoices.id"), nullable=False)
     field_name = Column(String, nullable=False)
     original_value = Column(String, nullable=True)
-    corrected_value = Column(String, nullable=True)
-    correction_type = Column(String, nullable=False)  # "missing", "wrong_value", "calculation"
-    rule = Column(String, nullable=True)  # e.g., "deposit = subtotal * 0.05"
+    corrected_value = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
-    created_by = Column(String, nullable=True)  # user_id
+
+class SupplierInvoice(Base):
+    """Stellar POS Supplier Invoice (ASN) Header"""
+    __tablename__ = "supplier_invoices"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    invoice_id = Column(String, unique=True, index=True) # ASN Number
+    supplier_name = Column(String)
+    supplier_invoice_number = Column(String, index=True)
+    original_po_number = Column(String, nullable=True)
+    store_id = Column(Integer, nullable=True)
+    store_name = Column(String, nullable=True)
+    created_date = Column(DateTime, nullable=True)
+    date_received = Column(DateTime, nullable=True)
+    date_posted = Column(DateTime, nullable=True)
+    invoice_type = Column(String, nullable=True)
+    tax_rate_name = Column(String, nullable=True)
+    tax_rate = Column(Float, nullable=True)
+    shipping_cost = Column(Float, nullable=True)
+    total_products = Column(Integer, nullable=True)
+    total_units = Column(Integer, nullable=True)
+    sub_total = Column(Float, nullable=True)
+    total_deposits = Column(Float, nullable=True)
+    total_taxes = Column(Float, nullable=True)
+    non_taxable_items = Column(Float, nullable=True)
+    freight_fees = Column(Float, nullable=True)
+    credits_discounts = Column(Float, nullable=True)
+    invoice_total = Column(Float, nullable=True)
+    status = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    meta_data = Column("metadata", String, nullable=True) # JSON store
+
+class SupplierInvoiceItem(Base):
+    """Stellar POS Supplier Invoice Line Items"""
+    __tablename__ = "supplier_invoice_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    invoice_id = Column(String, ForeignKey("supplier_invoices.invoice_id"), index=True)
+    line_number = Column(Integer, nullable=True)
+    sku = Column(String, index=True)
+    product_name = Column(String)
+    volume = Column(String, nullable=True)
+    units_ordered = Column(Integer, nullable=True)
+    received_quantity = Column(Float, nullable=True)
+    inventory_fill = Column(Integer, nullable=True)
+    unit_cost = Column(Float, nullable=True)
+    avg_cost = Column(Float, nullable=True)
+    total_cost = Column(Float, nullable=True)
+    deposit_per_unit = Column(Float, nullable=True)
+    total_deposits = Column(Float, nullable=True)
+    taxes = Column(Float, nullable=True)
+    all_in_cost = Column(Float, nullable=True)
+    variance_quantity = Column(Float, nullable=True)
+    invoice_date = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    meta_data = Column("metadata", String, nullable=True) # JSON store
+
 class Product(Base):
     """Master product data for validation"""
     __tablename__ = "products"

@@ -6,7 +6,7 @@ from datetime import datetime
 
 import models, schemas, auth
 from database import get_db
-from services import stellar_service
+from services import stellar_service, reporting_service
 from services.stellar_service import StellarError
 
 router = APIRouter(
@@ -122,3 +122,109 @@ async def proxy_search_suppliers(
         raise HTTPException(status_code=e.status_code or 500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+@router.get("/sync/{invoice_id}")
+async def sync_invoice_from_stellar(
+    invoice_id: str,
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """
+    Retrieve the latest data from Stellar for a specific invoice and update our records.
+    """
+    invoice = db.query(models.Invoice).filter(
+        models.Invoice.id == invoice_id,
+        models.Invoice.organization_id == ctx.org_id
+    ).first()
+    
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+        
+    if not invoice.stellar_asn_number:
+        raise HTTPException(status_code=400, detail="Invoice has not been posted to Stellar yet")
+        
+    # Get store/tenant config
+    store = db.query(models.Store).filter(
+        models.Store.organization_id == ctx.org_id
+    ).first()
+    
+    tenant_id = getattr(store, 'stellar_tenant', None)
+    if not tenant_id:
+        # Fallback to env default if store not configured
+        tenant_id = stellar_service.STELLAR_TENANT_ID
+        
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="Stellar Tenant ID not configured for this store")
+        
+    try:
+        # Retrieve latest data from Stellar
+        stellar_data = await stellar_service.retrieve_stellar_invoice(
+            asn_number=invoice.stellar_asn_number,
+            tenant_id=tenant_id
+        )
+        
+        # Update local record with latest response
+        import json
+        invoice.stellar_response = json.dumps(stellar_data)
+        
+        # If Stellar has a different internal ID/ASN, update ours
+        # (Useful if the first post returned a temporary ID)
+        if 'asn_number' in stellar_data:
+            invoice.stellar_asn_number = stellar_data['asn_number']
+        elif 'id' in stellar_data:
+            invoice.stellar_asn_number = stellar_data['id']
+            
+        db.commit()
+        db.refresh(invoice)
+        
+        return {
+            "status": "success",
+            "message": "Synced with Stellar",
+            "invoice": {
+                "id": invoice.id,
+                "stellar_asn_number": invoice.stellar_asn_number,
+                "stellar_data": stellar_data,
+                "stellar_tenant": tenant_id
+            }
+        }
+    except StellarError as e:
+        raise HTTPException(status_code=e.status_code or 500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
+
+@router.get("/reports/receiving-summary")
+def get_receiving_summary_report(
+    start_date: str = Query(..., description="ISO format date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="ISO format date (YYYY-MM-DD)"),
+    store_name: Optional[str] = Query(None),
+    format: str = Query("json", description="json or csv"),
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """
+    Generate the 'Receiving Summary' report for a date range.
+    """
+    try:
+        start_dt = datetime.fromisoformat(start_date)
+        end_dt = datetime.fromisoformat(end_date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+
+    data = reporting_service.generate_receiving_summary(
+        db=db,
+        start_date=start_dt,
+        end_date=end_dt,
+        store_name=store_name
+    )
+
+    if format.lower() == "csv":
+        from fastapi.responses import Response
+        csv_data = reporting_service.export_summary_to_csv(data)
+        return Response(
+            content=csv_data,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=receiving_summary_{start_date}_{end_date}.csv"}
+        )
+
+    return data
+

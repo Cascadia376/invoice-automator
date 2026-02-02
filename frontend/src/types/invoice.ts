@@ -1,4 +1,4 @@
-export type InvoiceStatus = 'ingested' | 'parsed' | 'needs_review' | 'ready_to_push' | 'pushed' | 'failed' | 'approved';
+export type InvoiceStatus = 'ingested' | 'parsed' | 'needs_review' | 'ready_to_push' | 'pushed' | 'failed' | 'approved' | 'posted';
 
 export interface LineItem {
   id: string;
@@ -34,6 +34,7 @@ export interface Invoice {
   stellarPostedAt?: string;
   stellarAsnNumber?: string;
   stellarResponse?: string;
+  stellarTenant?: string;
   status: InvoiceStatus;
   lineItems: LineItem[];
   issues?: Issue[];

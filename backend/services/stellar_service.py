@@ -124,7 +124,7 @@ async def post_invoice_to_stellar(
         models.Store.organization_id == invoice.organization_id
     ).first()
     
-    # Authoritative ID approach: IDs are stable, names are display-only/dynamic
+    # Authoritative ID approach: IDs are stable, names are displayed-only/dynamic
     # We use 'Location {ID}' as the base fallback if no name is known
     display_location_name = f"Location {location[:8]}..." 
     if store:
@@ -137,7 +137,7 @@ async def post_invoice_to_stellar(
         'location_name': display_location_name,
         'tax_ids': '',
         'supplierInvoiceNumber': invoice.invoice_number or '',
-        ...
+        # ... other fields if needed
     }
     # Prepare files
     files = {
@@ -333,6 +333,7 @@ async def search_stellar_suppliers(
         'limit': limit
     }
     
+    # Use inventory URL for search as confirmed in previous probes
     url = f"{STELLAR_INVENTORY_URL}/api/suppliers/retrieve/list"
     
     try:
@@ -353,3 +354,166 @@ async def search_stellar_suppliers(
     except Exception as e:
         logger.exception("Unexpected error searching Stellar suppliers")
         raise StellarError(f"Search failed: {str(e)}")
+
+
+async def retrieve_stellar_invoice(
+    asn_number: str,
+    tenant_id: str
+) -> Dict:
+    """
+    Retrieve ASN/Invoice details from Stellar using the ASN number.
+    
+    Args:
+        asn_number: The SUPL-INV-... reference number
+        tenant_id: Stellar tenant ID
+        
+    Returns:
+        JSON data from Stellar
+    """
+    if not STELLAR_API_TOKEN:
+        raise StellarError("STELLAR_API_TOKEN not configured")
+        
+    headers = {
+        'Authorization': f'Bearer {STELLAR_API_TOKEN}',
+        'tenant': tenant_id,
+        'tenant_id': tenant_id,
+        'accept': 'application/json, text/plain, */*',
+        'origin': f'https://{tenant_id}.stellarpos.io',
+        'referer': f'https://{tenant_id}.stellarpos.io/'
+    }
+    
+    # Correct endpoint found via static analysis & probing
+    url = f"https://stock-import.stellarpos.io/api/supplier-invoices/{asn_number}"
+    
+    logger.info(f"Retrieving ASN {asn_number} from Stellar")
+    
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(url, headers=headers)
+            
+            if not response.is_success:
+                logger.error(f"Stellar API Error {response.status_code}: {response.text[:200]}")
+                raise StellarError(
+                    f"Stellar Retrieval API error: {response.status_code}",
+                    status_code=response.status_code,
+                    response_data=response.text
+                )
+            
+            return response.json()
+            
+    except httpx.RequestError as e:
+        raise StellarError(f"Network error during retrieval: {str(e)}")
+    except Exception as e:
+        logger.exception(f"Unexpected error retrieving Stellar ASN {asn_number}")
+        raise StellarError(f"Retrieval failed: {str(e)}")
+
+
+def sync_stellar_data_to_db(
+    asn_number: str, 
+    stellar_data: Dict, 
+    db: Session,
+    organization_id: Optional[str] = None
+) -> models.SupplierInvoice:
+    """
+    Parse Stellar JSON data and sync it to the supplier_invoices and supplier_invoice_items tables.
+    """
+    # Unwrap 'result' object if present (structure seen in probe)
+    data_source = stellar_data.get('result', stellar_data)
+    
+    header = data_source.get('supplierInvoice', {})
+    if not header and 'id' in data_source:
+        # Fallback if structure is flat
+        header = data_source
+        
+    items = data_source.get('supplierInvoiceItems', [])
+
+    # 1. Update or create the Header
+    supplier_inv = db.query(models.SupplierInvoice).filter(
+        models.SupplierInvoice.invoice_id == asn_number
+    ).first()
+    
+    if not supplier_inv:
+        supplier_inv = models.SupplierInvoice(invoice_id=asn_number)
+        db.add(supplier_inv)
+
+    # Map header fields
+    supplier_inv.supplier_name = header.get('supplier_name')
+    supplier_inv.supplier_invoice_number = header.get('supplier_invoice_number') or header.get('invoice_number')
+    supplier_inv.original_po_number = header.get('original_po_number')
+    supplier_inv.status = header.get('status')
+    supplier_inv.store_name = header.get('location_name')
+    
+    # Financials
+    # Note: Stellar uses strings or floats, safest to allow simple casting or checking
+    def parse_float(val):
+        try:
+            return float(val) if val is not None else 0.0
+        except:
+            return 0.0
+
+    supplier_inv.sub_total = parse_float(header.get('sub_total') or header.get('total_amount_excluded_tax'))
+    supplier_inv.total_taxes = parse_float(header.get('total_tax') or header.get('tax_amount'))
+    supplier_inv.total_deposits = parse_float(header.get('total_deposit'))
+    supplier_inv.invoice_total = parse_float(header.get('total_amount_included_tax') or header.get('grand_total'))
+    
+    # Timestamps
+    for date_field, json_field in [
+        ('created_date', 'createdAt'), 
+        ('date_received', 'received_date'), 
+        ('date_posted', 'updatedAt')
+    ]:
+        val = header.get(json_field)
+        if val:
+            try:
+                # Handle Stellar's ISO strings
+                clean_val = val.replace('Z', '') if isinstance(val, str) else val
+                setattr(supplier_inv, date_field, datetime.fromisoformat(clean_val))
+            except:
+                pass
+
+    supplier_inv.meta_data = json.dumps(data_source) # Store full source for safety
+    db.commit()
+
+    # 2. Sync Line Items
+    # Clear existing items for this ASN to avoid duplicates on resync
+    db.query(models.SupplierInvoiceItem).filter(
+        models.SupplierInvoiceItem.invoice_id == asn_number
+    ).delete()
+
+    for i, item in enumerate(items):
+        db_item = models.SupplierInvoiceItem(
+            invoice_id=asn_number,
+            line_number=item.get('line_number', i + 1),
+            sku=str(item.get('sku') or item.get('product_sku') or ''),
+            product_name=item.get('product_name') or item.get('item_name'),
+            volume=str(item.get('volume', '')),
+            units_ordered=int(item.get('units_ordered') or 0),
+            received_quantity=parse_float(item.get('shipped_qty_received') or item.get('received_qty')),
+            inventory_fill=item.get('inventory_fill'),
+            unit_cost=parse_float(item.get('unit_price') or item.get('unit_cost')),
+            avg_cost=parse_float(item.get('average_cost')),
+            total_cost=parse_float(item.get('total_cost') or item.get('sub_total')),
+            total_deposits=parse_float(item.get('total_deposit')),
+            taxes=parse_float(item.get('tax_amount')),
+            all_in_cost=parse_float(item.get('all_in_cost') or item.get('total_amount_included_tax')),
+            variance_quantity=parse_float(item.get('variance_qty')),
+            meta_data=json.dumps(item)
+        )
+        db.add(db_item)
+    
+    db.commit()
+    db.refresh(supplier_inv)
+    
+    # 3. Try to link back to our local 'invoices' table
+    if organization_id and supplier_inv.supplier_invoice_number:
+        local_inv = db.query(models.Invoice).filter(
+            models.Invoice.organization_id == organization_id,
+            models.Invoice.invoice_number == supplier_inv.supplier_invoice_number
+        ).first()
+        
+        if local_inv:
+            local_inv.stellar_asn_number = asn_number
+            local_inv.is_posted = True
+            db.commit()
+
+    return supplier_inv

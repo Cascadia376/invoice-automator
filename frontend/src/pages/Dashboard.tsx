@@ -13,7 +13,7 @@ export default function Dashboard() {
     const { getToken } = useAuth();
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState("");
-    const [statusFilter, setStatusFilter] = useState<'all' | 'needs_review' | 'approved' | 'failed' | 'issue'>('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'needs_review' | 'approved' | 'posted' | 'failed' | 'issue'>('all');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isLoading, setIsLoading] = useState(false);
 
@@ -477,6 +477,12 @@ export default function Dashboard() {
                         Approved
                     </button>
                     <button
+                        onClick={() => setStatusFilter('posted')}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === 'posted' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Posted
+                    </button>
+                    <button
                         onClick={() => setStatusFilter('failed')}
                         className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === 'failed' ? 'bg-white text-danger shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
@@ -584,6 +590,11 @@ export default function Dashboard() {
                                             {invoice.status === 'approved' && (
                                                 <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
                                                     <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-green-500"></span>Approved
+                                                </span>
+                                            )}
+                                            {invoice.status === 'posted' && (
+                                                <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-800">
+                                                    <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-indigo-500"></span>Posted
                                                 </span>
                                             )}
                                             {invoice.status === 'failed' && (

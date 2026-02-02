@@ -15,6 +15,7 @@ import {
   FileDown,
   CheckCircle2,
   AlertTriangle,
+  RefreshCcw,
 } from "lucide-react";
 import {
   ResizableHandle,
@@ -39,6 +40,7 @@ export default function InvoiceReview() {
   const [isPdfVisible, setIsPdfVisible] = useState(true);
   const { saveDraft, getDraft, clearDraft, hasDraft } = useLocalDraft();
   const [isPosting, setIsPosting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Highlight State
   const [highlights, setHighlights] = useState<Record<string, any[]>>({});
@@ -241,6 +243,43 @@ export default function InvoiceReview() {
       toast.error(error.message || "Failed to post to Stellar POS");
     } finally {
       setIsPosting(false);
+    }
+  };
+
+  const handleSyncStellar = async () => {
+    if (!invoice) return;
+    setIsSyncing(true);
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE}/api/stellar/sync/${invoice.id}`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.detail || "Failed to sync with Stellar");
+      }
+
+      // Update local state with the synced data
+      if (result.invoice) {
+        setInvoice(prev => prev ? {
+          ...prev,
+          stellarAsnNumber: result.invoice.stellar_asn_number,
+          stellarResponse: JSON.stringify(result.invoice.stellar_data),
+          stellarTenant: result.invoice.stellar_tenant
+        } : undefined);
+      }
+
+
+      toast.success("Synced with Stellar", {
+        description: "Latest data has been retrieved and saved.",
+      });
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Failed to sync with Stellar");
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -558,9 +597,33 @@ export default function InvoiceReview() {
                         Posted to Stellar
                       </div>
                       <div className="flex flex-col items-end text-[10px] text-muted-foreground font-mono leading-tight pr-1">
-                        {invoice.stellarAsnNumber && <span>ASN: {invoice.stellarAsnNumber}</span>}
+                        {invoice.stellarAsnNumber && (
+                          <div className="flex flex-col items-end gap-1">
+                            <span>ASN: {invoice.stellarAsnNumber}</span>
+                            {invoice.stellarTenant && (
+                              <a
+                                href={`https://${invoice.stellarTenant}.stellarpos.io/supplier-invoices/${invoice.stellarAsnNumber}/review`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 flex items-center gap-1 font-sans text-[11px] font-bold"
+                              >
+                                <span>View in Stellar</span>
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
+                          </div>
+                        )}
                         {invoice.stellarPostedAt && <span>{new Date(invoice.stellarPostedAt).toLocaleString()}</span>}
                       </div>
+
+                      <button
+                        onClick={handleSyncStellar}
+                        disabled={isSyncing}
+                        className="flex items-center gap-1.5 mt-1 px-2 py-1 text-[11px] font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors disabled:opacity-50"
+                      >
+                        {isSyncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCcw className="h-3 w-3" />}
+                        Sync latest from Stellar
+                      </button>
                     </div>
                   )}
 

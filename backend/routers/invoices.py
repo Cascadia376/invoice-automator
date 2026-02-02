@@ -191,10 +191,13 @@ def read_invoices(
         total = query.count()
         invoices = query.order_by(models.Invoice.created_at.desc()).offset(skip).limit(limit).all()
         
-        # Point to proxy endpoint
+        # Point to proxy endpoint and add tenant for linking
+        store = db.query(models.Store).filter(models.Store.organization_id == ctx.org_id).first()
         for inv in invoices:
             if inv.file_url:
                  inv.file_url = f"/api/invoices/{inv.id}/file"
+            if store:
+                inv.stellar_tenant = store.stellar_tenant
                  
         return {
             "items": invoices,
@@ -218,7 +221,7 @@ def get_dashboard_stats(
     
     total_invoices = base_query.count()
     needs_review = base_query.filter(models.Invoice.status == 'needs_review').count()
-    approved = base_query.filter(or_(models.Invoice.status == 'approved', models.Invoice.status == 'pushed')).count()
+    approved = base_query.filter(or_(models.Invoice.status == 'approved', models.Invoice.status == 'pushed', models.Invoice.status == 'posted')).count()
     
     # Invoices with issues: Count active issues from the Issue model
     issue_count = db.query(models.Issue).filter(
@@ -297,6 +300,11 @@ def read_invoice(
     # Point to proxy endpoint
     if invoice.file_url:
          invoice.file_url = f"/api/invoices/{invoice.id}/file"
+
+    # Fetch store/tenant for linking
+    store = db.query(models.Store).filter(models.Store.organization_id == ctx.org_id).first()
+    if store:
+        invoice.stellar_tenant = store.stellar_tenant
 
     # Calculate Category Summary
     summary = {}
@@ -414,6 +422,7 @@ async def post_invoice_to_pos(
     
     # Mark as posted in our system
     db_invoice.is_posted = True
+    db_invoice.status = 'posted'
     
     # Attempt to post to Stellar if configured
     stellar_result = None
@@ -439,6 +448,11 @@ async def post_invoice_to_pos(
     if db_invoice.file_url:
          db_invoice.file_url = f"/api/invoices/{db_invoice.id}/file"
     
+    # Add tenant for linking
+    store = db.query(models.Store).filter(models.Store.organization_id == ctx.org_id).first()
+    if store:
+        db_invoice.stellar_tenant = store.stellar_tenant
+    
     # Add Stellar status to response (not in schema, but useful for debugging)
     response_data = db_invoice
     if stellar_error:
@@ -456,7 +470,7 @@ def bulk_post_invoices(
     db.query(models.Invoice).filter(
         models.Invoice.id.in_(invoice_ids),
         models.Invoice.organization_id == ctx.org_id
-    ).update({"is_posted": True}, synchronize_session=False)
+    ).update({"is_posted": True, "status": "posted"}, synchronize_session=False)
     db.commit()
     return {"status": "success", "message": f"Marked {len(invoice_ids)} invoices as posted"}
 
@@ -468,7 +482,7 @@ def get_category_summary(
 ):
     query = db.query(models.Invoice).filter(
         models.Invoice.organization_id == ctx.org_id,
-        models.Invoice.status == 'approved',
+        or_(models.Invoice.status == 'approved', models.Invoice.status == 'posted'),
         models.Invoice.is_posted == True
     )
     
