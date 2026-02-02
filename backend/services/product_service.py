@@ -8,7 +8,7 @@ from datetime import datetime
 
 # Configuration
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
 _supabase: Optional[Client] = None
 
@@ -59,7 +59,8 @@ def get_product_by_sku(db: Session, org_id: str, sku: str) -> Optional[models.Pr
     # 2. Try Supabase
     try:
         sb = get_supabase()
-        response = sb.table("products").select("*").eq("sku", sku).execute()
+        # The table name in Supabase is 'product' (singular)
+        response = sb.table("product").select("*").eq("sku", sku).execute()
         
         if response.data:
             sb_prod = response.data[0]
@@ -72,7 +73,7 @@ def get_product_by_sku(db: Session, org_id: str, sku: str) -> Optional[models.Pr
             new_prod = models.Product(
                 organization_id=org_id,
                 sku=sb_prod.get("sku"),
-                name=sb_prod.get("name"),
+                name=sb_prod.get("product_name") or sb_prod.get("name"),
                 category=normalized_cat,
                 units_per_case=float(sb_prod.get("units_per_case", 1.0)) if sb_prod.get("units_per_case") is not None else 1.0,
                 average_cost=float(sb_prod.get("average_cost", 0.0)) if sb_prod.get("average_cost") is not None else 0.0,
@@ -118,7 +119,7 @@ def validate_item_against_master(db: Session, org_id: str, item: Dict) -> Dict:
         
     return {
         "status": "success",
-        "product_id": product.id,
+        "product_id": product.sku,
         "master_name": product.name,
         "master_category": product.category,
         "flags": flags

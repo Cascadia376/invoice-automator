@@ -162,6 +162,8 @@ class VendorCorrection(Base):
     field_name = Column(String, nullable=False)
     original_value = Column(String, nullable=True)
     corrected_value = Column(String, nullable=False)
+    correction_type = Column(String, nullable=True) # wrong_value, missing, ignored
+    created_by = Column(String, nullable=True) # user_id
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class SupplierInvoice(Base):
