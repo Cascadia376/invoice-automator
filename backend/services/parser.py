@@ -34,10 +34,13 @@ def extract_invoice_data(file_path: str, org_id: str, s3_key: str = None, s3_buc
     2. If fails, use LLM to extract data AND generate a new template (Fallback + Learning)
     """
     
-    # 1. Try invoice2data
+    # 1. Try Template Matching
     print(f"Attempting extraction with invoice2data for {file_path}")
+    temp_template_dir = None
     try:
-        templates = get_templates_from_db(org_id)
+        templates_data = get_templates_from_db(org_id)
+        templates = templates_data["templates"]
+        temp_template_dir = templates_data["temp_dir"]
         
         # invoice2data extraction
         result = extract_data(file_path, templates=templates)
@@ -53,8 +56,13 @@ def extract_invoice_data(file_path: str, org_id: str, s3_key: str = None, s3_buc
             else:
                 print(f"Template matched but no line items found. Falling back to LLM.")
             
-    except Exception as e:
-        print(f"invoice2data extraction failed: {e}")
+    finally:
+        # Cleanup unique temp template dir
+        if temp_template_dir and os.path.exists(temp_template_dir):
+            try:
+                shutil.rmtree(temp_template_dir)
+            except:
+                pass
 
     # 2. Fallback to LLM (and learn)
     print("No template matched or incomplete data. Falling back to LLM extraction and template generation...")
@@ -454,15 +462,16 @@ def empty_invoice_data():
     }
 
 def get_templates_from_db(org_id: str):
+    """Fetch templates and save to a unique temp directory for invoice2data."""
     db = SessionLocal()
+    # Create request-unique temp dir to avoid collisions between workers/splits
+    unique_id = str(uuid.uuid4())
+    temp_dir = os.path.join(tempfile.gettempdir(), f'invoice_templates_{unique_id}')
+    
     try:
         db_templates = db.query(models.Template).filter(models.Template.organization_id == org_id).all()
         
-        # Create temp dir for invoice2data
-        temp_dir = os.path.join(tempfile.gettempdir(), 'invoice_templates')
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
-        os.makedirs(temp_dir)
+        os.makedirs(temp_dir, exist_ok=True)
         
         # Write DB templates to files
         for t in db_templates:
@@ -471,16 +480,16 @@ def get_templates_from_db(org_id: str):
             with open(os.path.join(temp_dir, filename), 'w') as f:
                 f.write(t.content)
                 
-        # Copy local generic template if it exists
+        # Copy local generic templates if they exist
         local_template_dir = os.path.join(os.path.dirname(__file__), '../templates')
         if os.path.exists(local_template_dir):
              for f in os.listdir(local_template_dir):
-                 if f.endswith('.yml'):
+                 if f.endswith('.yml') or f.endswith('.yaml'):
                      shutil.copy(os.path.join(local_template_dir, f), temp_dir)
         
-        return read_templates(temp_dir)
+        return {"templates": read_templates(temp_dir), "temp_dir": temp_dir}
     except Exception as e:
         print(f"Error loading templates from DB: {e}")
-        return []
+        return {"templates": [], "temp_dir": temp_dir}
     finally:
         db.close()

@@ -30,6 +30,10 @@ async def upload_invoice(
     db: Session = Depends(get_db),
     ctx: auth.UserContext = Depends(auth.get_current_user)
 ):
+    if not ctx:
+        print("UPLOAD FAIL: Missing user context")
+        raise HTTPException(status_code=401, detail="Authentication required")
+        
     print(f"UPLOAD REQUEST: User={ctx.user_id}, Org={ctx.org_id}, File={file.filename}")
     try:
         file_id = str(uuid.uuid4())
@@ -155,10 +159,10 @@ async def upload_invoice(
 
         return created_invoices
     except Exception as e:
-        print(f"ERROR processing invoice: {e}")
         import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        error_detail = traceback.format_exc()
+        print(f"ERROR processing invoice: {error_detail}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}\n{error_detail}")
 
 from sqlalchemy import or_
 
