@@ -36,8 +36,13 @@ app.add_middleware(
 async def global_exception_handler(request: Request, exc: Exception):
     print(f"GLOBAL ERROR: {exc}")
     traceback.print_exc()
+    error_trace = traceback.format_exc()
     origin = request.headers.get("origin")
-    response_content = {"detail": str(exc), "type": type(exc).__name__}
+    response_content = {
+        "detail": str(exc), 
+        "type": type(exc).__name__,
+        "traceback": error_trace 
+    }
     response = JSONResponse(status_code=500, content=response_content)
     
     if origin and (origin in origins or ".vercel.app" in origin):
