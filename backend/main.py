@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 import os
 import traceback
 import models, database
-from routers import invoices, vendors, gl_categories, debug, issues, admin, auth_router, stellar
+from routers import invoices, vendors, gl_categories, debug, issues, admin, auth_router, stellar, reports
 import auth
 
 models.Base.metadata.create_all(bind=database.engine)
@@ -56,6 +56,7 @@ app.include_router(admin.router)
 app.include_router(stellar.router)
 app.include_router(debug.router)
 app.include_router(auth_router.router)
+app.include_router(reports.router)
 
 @app.get("/")
 @app.get("/api/health")
