@@ -57,3 +57,10 @@ You must add the following **Secrets** to your GitHub Repository (Settings -> Se
 
 **Workflow File:** `.github/workflows/daily_sync.yml`
 **Script:** `backend/scripts/daily_auto_sync.py`
+
+## Reports Dashboard
+I have added a new **Reports** page to the application.
+- **Location:** Sidebar -> Reports
+- **Functionality:** Select any date range (Start/End) and download the **Receiving Summary CSV**.
+- **Data Source:** Generates the report dynamically from the database, ensuring it always includes the latest synced invoices.
+
