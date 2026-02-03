@@ -47,9 +47,8 @@ def normalize_category(raw_category: str) -> str:
 
 def get_product_by_sku(db: Session, org_id: str, sku: str) -> Optional[models.Product]:
     """Get product from local DB, fallback to Supabase."""
-    # 1. Try local cache
+    # 1. Try local cache (no org_id filter - product table is global)
     product = db.query(models.Product).filter(
-        models.Product.organization_id == org_id,
         models.Product.sku == sku
     ).first()
     
@@ -71,11 +70,10 @@ def get_product_by_sku(db: Session, org_id: str, sku: str) -> Optional[models.Pr
             
             # 3. Save to local cache
             new_prod = models.Product(
-                organization_id=org_id,
                 sku=sb_prod.get("sku"),
                 name=sb_prod.get("product_name") or sb_prod.get("name"),
                 category=normalized_cat,
-                units_per_case=float(sb_prod.get("units_per_case", 1.0)) if sb_prod.get("units_per_case") is not None else 1.0,
+                units_per_case=int(sb_prod.get("units_per_case", 1)) if sb_prod.get("units_per_case") is not None else 1,
                 average_cost=float(sb_prod.get("average_cost", 0.0)) if sb_prod.get("average_cost") is not None else 0.0,
                 last_cost=float(sb_prod.get("last_cost", 0.0)) if sb_prod.get("last_cost") is not None else 0.0,
                 min_typical_qty=float(sb_prod.get("min_typical_qty", 0.0)) if sb_prod.get("min_typical_qty") else None,

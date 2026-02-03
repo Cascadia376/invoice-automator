@@ -224,13 +224,12 @@ class SupplierInvoiceItem(Base):
 
 class Product(Base):
     """Master product data for validation"""
-    __tablename__ = "products"
+    __tablename__ = "product"
 
-    sku = Column("product_id", String, primary_key=True, index=True)
-    organization_id = Column(String, index=True, nullable=False)
-    name = Column(String)
+    sku = Column(String, primary_key=True, index=True)
+    name = Column("product_name", String)
     category = Column(String, nullable=True)
-    units_per_case = Column(Float, default=1.0)
+    units_per_case = Column(Integer, default=1)
     average_cost = Column(Float, default=0.0)
     last_cost = Column(Float, default=0.0)
     min_typical_qty = Column(Float, nullable=True)
@@ -244,7 +243,7 @@ class ProductOrder(Base):
 
     id = Column(String, primary_key=True, index=True)
     organization_id = Column(String, index=True, nullable=False)
-    product_id = Column(String, ForeignKey("products.product_id"))
+    product_id = Column(String, ForeignKey("product.sku"))
     invoice_id = Column(String, ForeignKey("invoices.id"))
     quantity = Column(Float)
     unit_cost = Column(Float)
