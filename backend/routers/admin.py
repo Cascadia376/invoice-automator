@@ -52,12 +52,18 @@ def get_my_stores(
 ):
     """Get stores the current user has access to"""
     # 1. Get all roles for user to find org IDs
-    user_roles = db.query(models.UserRole).filter(
-        models.UserRole.user_id == ctx.user_id
-    ).all()
-    
-    org_ids = list(set([ur.organization_id for ur in user_roles]))
-    
+    # 1. Get all roles for user to find org IDs using RAW SQL to bypass ORM issues
+    from sqlalchemy import text
+    try:
+        # Debug with raw SQL
+        sql = text("SELECT organization_id FROM user_roles WHERE user_id = :uid")
+        result = db.execute(sql, {"uid": ctx.user_id}).fetchall()
+        org_ids = [str(row[0]) for row in result]
+        print(f"DEBUG RAW SQL: Found {len(org_ids)} roles: {org_ids}")
+    except Exception as e:
+        print(f"DEBUG RAW SQL ERROR: {e}")
+        org_ids = []
+
     # 2. Fetch Stores by organization_id (handles both int and string IDs like 'dev-org')
     if not org_ids:
         return []
@@ -68,7 +74,7 @@ def get_my_stores(
     
     # 3. Convert to response format
     debug_msg = f" [Roles: {len(org_ids)}]"
-    if len(stores) == 1:
+    if len(stores) <= 1:
         debug_msg += f" Orgs: {','.join(str(oid) for oid in org_ids)}"
         
     return [schemas.StoreSchema(id=s.organization_id, name=f"{s.name}{debug_msg}") for s in stores]
