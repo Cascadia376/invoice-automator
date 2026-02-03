@@ -58,24 +58,16 @@ def get_my_stores(
     
     org_ids = list(set([ur.organization_id for ur in user_roles]))
     
-    # 2. Convert to ints for Store query (handling potential non-int legacy IDs safely)
-    store_ids = []
-    for oid in org_ids:
-        try:
-            store_ids.append(int(oid))
-        except ValueError:
-            pass
-            
-    # 3. Fetch Stores
-    if not store_ids:
+    # 2. Fetch Stores by organization_id (handles both int and string IDs like 'dev-org')
+    if not org_ids:
         return []
         
     stores = db.query(models.Store).filter(
-        models.Store.store_id.in_(store_ids)
+        models.Store.organization_id.in_(org_ids)
     ).all()
     
-    # 4. Convert to response format
-    return [schemas.StoreSchema(id=str(s.store_id), name=s.name) for s in stores]
+    # 3. Convert to response format
+    return [schemas.StoreSchema(id=s.organization_id, name=s.name) for s in stores]
 
 @router.get("/admin/organizations", dependencies=[Depends(auth.require_role("admin"))], response_model=List[schemas.StoreSchema])
 def list_all_organizations(
