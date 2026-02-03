@@ -32,6 +32,50 @@ class UserInvite(BaseModel):
     role: str
     target_org_ids: List[str] = []
 
+@router.get("/debug/me")
+def debug_me(
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """
+    Detailed debug endpoint to inspect UserContext and Environment.
+    Use this to troubleshoot 'Super Admin Bypass'.
+    """
+    
+    # 1. Inspect Context
+    context_data = {
+        "user_id": ctx.user_id,
+        "email": ctx.email,
+        "org_id": ctx.org_id,
+        "bypass_check": {
+            "is_jay": ctx.email and ctx.email.lower().strip() == "jay@trufflesgroup.com",
+            "raw_email": ctx.email
+        }
+    }
+    
+    # 2. Inspect Stores in DB
+    all_stores = db.query(models.Store).all()
+    store_data = [
+        {"id": s.store_id, "name": s.name, "org_id": s.organization_id} 
+        for s in all_stores
+    ]
+    
+    # 3. Inspect Roles in DB
+    roles = db.query(models.UserRole).filter(models.UserRole.user_id == ctx.user_id).all()
+    role_data = [
+        {"role": r.role_id, "org": r.organization_id}
+        for r in roles
+    ]
+    
+    return {
+        "context": context_data,
+        "stores_in_db": {
+            "count": len(all_stores),
+            "items": store_data
+        },
+        "user_db_roles": role_data
+    }
+
 @router.get("/users/me/roles")
 def get_my_roles(
     db: Session = Depends(get_db),
