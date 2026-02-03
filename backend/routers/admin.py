@@ -67,7 +67,11 @@ def get_my_stores(
     ).all()
     
     # 3. Convert to response format
-    return [schemas.StoreSchema(id=s.organization_id, name=s.name) for s in stores]
+    debug_msg = f" [Roles: {len(org_ids)}]"
+    if len(stores) == 1:
+        debug_msg += f" Orgs: {','.join(str(oid) for oid in org_ids)}"
+        
+    return [schemas.StoreSchema(id=s.organization_id, name=f"{s.name}{debug_msg}") for s in stores]
 
 @router.get("/admin/organizations", dependencies=[Depends(auth.require_role("admin"))], response_model=List[schemas.StoreSchema])
 def list_all_organizations(
