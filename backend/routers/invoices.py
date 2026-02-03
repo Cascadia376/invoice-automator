@@ -87,12 +87,13 @@ async def upload_invoice(
             vendor = vendor_service.get_or_create_vendor(db, vendor_name, ctx.org_id)
             extracted_data = vendor_service.apply_vendor_corrections(db, extracted_data, vendor)
             
-            print(f"STAGE 2.{i+1}.4: Item validation...")
-            for item in extracted_data.get("line_items", []):
-                validation = product_service.validate_item_against_master(db, ctx.org_id, item)
-                if validation["status"] == "success" and validation["flags"]:
-                    if validation.get("master_category"):
-                        item["category_gl_code"] = validation["master_category"]
+            # DISABLED: Product validation (was causing 500 errors with wrong table)
+            # print(f"STAGE 2.{i+1}.4: Item validation...")
+            # for item in extracted_data.get("line_items", []):
+            #     validation = product_service.validate_item_against_master(db, ctx.org_id, item)
+            #     if validation["status"] == "success" and validation["flags"]:
+            #         if validation.get("master_category"):
+            #             item["category_gl_code"] = validation["master_category"]
             
             # Create DB Entry
             print(f"STAGE 2.{i+1}.5: Creating DB entries...")
