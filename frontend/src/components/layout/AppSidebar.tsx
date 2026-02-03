@@ -37,23 +37,22 @@ export function AppSidebar() {
                         Cascadia Invoice Assistant
                     </h2>
                 </div>
-                <div className="px-2 pb-2 text-xs text-muted-foreground">
-                    Debug: {stores.length} stores
-                </div>
-                <div className="px-2">
-                    <Select value={orgId || ""} onValueChange={switchStore}>
-                        <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select Store" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {stores.map((store) => (
-                                <SelectItem key={store.id} value={store.id}>
-                                    {store.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
+                {stores.length > 0 && (
+                    <div className="px-2">
+                        <Select value={orgId || ""} onValueChange={switchStore}>
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select Store" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {stores.map((store) => (
+                                    <SelectItem key={store.id} value={store.id}>
+                                        {store.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
             </div>
 
             <nav className="flex-1 p-4 space-y-2">
