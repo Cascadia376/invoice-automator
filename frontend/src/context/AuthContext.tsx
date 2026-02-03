@@ -51,15 +51,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchStores = async (token: string) => {
     try {
+      console.log("[AuthDebug] Fetching stores...");
       const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/users/me/stores`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
+        console.log(`[AuthDebug] Fetched ${data?.length} stores:`, data);
         setStores(data || []);
+      } else {
+        console.error(`[AuthDebug] Failed to fetch stores: ${res.status}`);
       }
     } catch (e) {
-      console.error("Error fetching stores", e);
+      console.error("[AuthDebug] Error fetching stores", e);
     }
   };
 
