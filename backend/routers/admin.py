@@ -39,7 +39,7 @@ def get_my_roles(
 ):
     """Get roles for the current user in the current context"""
     # SUPER ADMIN BYPASS
-    if ctx.email == "jay@trufflesgroup.com":
+    if ctx.email and ctx.email.lower().strip() == "jay@trufflesgroup.com":
         return {"roles": ["admin"]}
 
     user_roles = db.query(models.UserRole).filter(
@@ -56,10 +56,15 @@ def get_my_stores(
 ):
     """Get stores the current user has access to"""
     
+    print(f"DEBUG: get_my_stores called for {ctx.email} (User ID: {ctx.user_id})")
+    
     # SUPER ADMIN BYPASS
-    if ctx.email == "jay@trufflesgroup.com":
+    if ctx.email and ctx.email.lower().strip() == "jay@trufflesgroup.com":
+        print("DEBUG: Super Admin Bypass TRIGGERED for stores")
         stores = db.query(models.Store).all()
         return [schemas.StoreSchema(id=s.organization_id, name=s.name) for s in stores]
+
+    print("DEBUG: Super Admin Bypass NOT triggered")
 
     # 1. Get all roles for user to find org IDs
     user_roles = db.query(models.UserRole).filter(
