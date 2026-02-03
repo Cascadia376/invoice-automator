@@ -73,10 +73,9 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         // Prevent infinite loops if we've failed too many times
         if (retryCount > 3) {
             console.error("DEBUG: Max retries reached for fetching invoices. Stopping.");
-            // Only toast once to avoid spam
             if (retryCount === 4) {
                 toast.error("Unable to connect to server. Please refresh the page manually.");
-                setRetryCount(5); // Increment to ensure we don't toast again
+                setRetryCount(5);
             }
             return;
         }
@@ -95,53 +94,58 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (status && status !== 'all') queryParams.append('status', status);
 
         const url = `${API_URL}/invoices?${queryParams.toString()}`;
-        console.log(`DEBUG: Refreshing invoices from ${url}`);
+
         try {
             const token = await getToken();
+
+            console.log(`[InvoiceDebug] Fetching invoices from ${url}`);
+            console.log(`[InvoiceDebug] Auth State - Token present: ${!!token}, OrgID: ${orgId}, DisableAuth: ${disableAuth}`);
+
             if (!token && !disableAuth) {
+                console.warn("[InvoiceDebug] Aborting fetch: No token and auth is enabled.");
                 setIsLoading(false);
                 return;
             }
+
             const response = await fetch(url, {
                 headers: {
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
                     ...(orgId ? { "x-organization-id": orgId } : {})
                 }
             });
+
             if (response.ok) {
                 const data = await response.json();
-                console.log("DEBUG: Fetched invoices:", data);
+                console.log("[InvoiceDebug] Fetched invoices successfully. Count:", Array.isArray(data) ? data.length : data.items?.length);
 
-                // Success! Reset retry count
                 setRetryCount(0);
 
                 if (Array.isArray(data)) {
-                    // Backwards compatibility for old array response
                     setInvoices(data);
                     setTotalCount(data.length);
                     setCurrentPage(1);
                 } else {
-                    // New paginated object response
                     setInvoices(data.items || []);
                     setTotalCount(data.total || 0);
                     setPageSize(data.limit || 25);
                     setCurrentPage(Math.floor((data.skip || 0) / (data.limit || 25)) + 1);
                 }
             } else {
-                console.error(`DEBUG: Failed to fetch invoices. Status: ${response.status}`);
-                // Increment retry count on server error
+                console.error(`[InvoiceDebug] Failed to fetch invoices. Status: ${response.status}`);
+                if (response.status === 401) {
+                    console.error("[InvoiceDebug] 401 Unauthorized - Token might be invalid or expired.");
+                }
                 if (response.status >= 500) {
                     setRetryCount(prev => prev + 1);
                 }
             }
         } catch (error) {
-            console.error(`DEBUG: Network or Fetch error:`, error);
-            // Increment retry count on network error
+            console.error(`[InvoiceDebug] Network or Fetch error:`, error);
             setRetryCount(prev => prev + 1);
         } finally {
             setIsLoading(false);
         }
-    }, [getToken, disableAuth, retryCount, refreshStats, orgId]); // Added retryCount and refreshStats to deps
+    }, [getToken, disableAuth, retryCount, refreshStats, orgId]);
 
     const setPage = useCallback((page: number) => {
         const skip = (page - 1) * pageSize;
