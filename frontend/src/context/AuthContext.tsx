@@ -59,11 +59,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const data = await res.json();
         console.log(`[AuthDebug] Fetched ${data?.length} stores:`, data);
         setStores(data || []);
+        return data || [];
       } else {
         console.error(`[AuthDebug] Failed to fetch stores: ${res.status}`);
+        return [];
       }
     } catch (e) {
       console.error("[AuthDebug] Error fetching stores", e);
+      return [];
     }
   };
 
@@ -74,7 +77,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(data.session?.user ?? null);
 
       if (data.session?.user && data.session?.access_token) {
-        // Fetch the actual org_id from the backend to ensure consistency
+        // Fetch stores first to validate org Access
+        const stores = await fetchStores(data.session.access_token);
+
+        // Try to determine the active org
+        let activeOrgCandidate: string | null = null;
+        let useBackendOrg = false;
+
+        // 1. Check if backend tells us who we are (JWT claims)
         try {
           const whoamiRes = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/whoami`, {
             headers: { Authorization: `Bearer ${data.session.access_token}` }
@@ -86,25 +96,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (backendOrgId) {
               console.log(`[AuthDebug] Using backend org_id: ${backendOrgId}`);
-              setActiveOrgId(backendOrgId);
-              await fetchStores(data.session.access_token);
-              fetchRoles(data.session.user.id, backendOrgId, data.session.access_token);
-              setLoading(false);
-              return;
+              activeOrgCandidate = backendOrgId;
+              useBackendOrg = true;
             }
           }
         } catch (e) {
           console.error("[AuthDebug] Failed to fetch whoami, falling back to metadata", e);
         }
 
-        // Fallback to original logic if whoami fails
-        const persistedOrg = localStorage.getItem("active_org_id");
-        const defaultOrg = data.session.user.user_metadata?.org_id || data.session.user.id;
-        const currentOrg = persistedOrg || defaultOrg;
+        // 2. If no backend org (or we want to verify it), check persistence
+        if (!activeOrgCandidate) {
+          const persistedOrg = localStorage.getItem("active_org_id");
+          const defaultOrg = data.session.user.user_metadata?.org_id || data.session.user.id;
+          activeOrgCandidate = persistedOrg || defaultOrg;
+        }
 
-        setActiveOrgId(currentOrg);
-        await fetchStores(data.session.access_token);
-        fetchRoles(data.session.user.id, currentOrg, data.session.access_token);
+        // 3. Validation: Ensure candidate is in the user's stores
+        // Only if we actually have stores to check against.
+        if (stores.length > 0) {
+          const isValid = stores.some(s => s.id === activeOrgCandidate);
+          if (!isValid) {
+            console.log(`[AuthDebug] Org ${activeOrgCandidate} is not in user's stores. Switching to ${stores[0].name}`);
+            activeOrgCandidate = stores[0].id;
+            // Update persistence if we auto-switched
+            localStorage.setItem("active_org_id", activeOrgCandidate);
+          }
+        }
+
+        // 4. Set State
+        if (activeOrgCandidate) {
+          setActiveOrgId(activeOrgCandidate);
+          fetchRoles(data.session.user.id, activeOrgCandidate, data.session.access_token);
+        }
       }
 
       setLoading(false);
@@ -112,17 +135,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     init();
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
       if (newSession?.user) {
+        const stores = await fetchStores(newSession.access_token);
+
         const persistedOrg = localStorage.getItem("active_org_id");
         const defaultOrg = newSession.user.user_metadata?.org_id || newSession.user.id;
-        const currentOrg = persistedOrg || defaultOrg;
+        let currentOrg = persistedOrg || defaultOrg;
 
-        if (!activeOrgId) setActiveOrgId(currentOrg);
+        if (stores.length > 0) {
+          const isValid = stores.some(s => s.id === currentOrg);
+          if (!isValid) {
+            currentOrg = stores[0].id;
+            localStorage.setItem("active_org_id", currentOrg);
+          }
+        }
 
-        fetchStores(newSession.access_token);
+        if (!activeOrgId || activeOrgId !== currentOrg) {
+          setActiveOrgId(currentOrg);
+        }
+
         fetchRoles(newSession.user.id, currentOrg, newSession.access_token);
       } else {
         setRoles([]);

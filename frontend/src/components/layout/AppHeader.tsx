@@ -3,9 +3,16 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 export function AppHeader() {
-    const { user, signOut, isAdmin } = useAuth();
+    const { user, signOut, isAdmin, stores, orgId, switchStore } = useAuth();
     const navItems = [
         { icon: Home, label: "Dashboard", href: "/dashboard" },
         { icon: AlertCircle, label: "Issue Tracker", href: "/issues" },
@@ -54,6 +61,22 @@ export function AppHeader() {
                 </div>
 
                 <div className="flex items-center gap-4">
+                    {stores.length > 0 && (
+                        <div className="w-[200px]">
+                            <Select value={orgId || ""} onValueChange={switchStore}>
+                                <SelectTrigger className="w-full h-9">
+                                    <SelectValue placeholder="Select Store" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {stores.map((store) => (
+                                        <SelectItem key={store.id} value={store.id}>
+                                            {store.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
                     <span className="text-sm text-muted-foreground hidden sm:inline-block">
                         {user?.email || "Signed in"}
                     </span>
