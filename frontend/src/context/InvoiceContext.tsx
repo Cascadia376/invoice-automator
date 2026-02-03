@@ -179,6 +179,9 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             return;
         }
 
+        // Clear existing data when switching contexts to avoid "flashing" wrong data
+        setInvoices([]);
+
         if (user || orgId || disableAuth) {
             refreshInvoices();
             fetchGLCategories();
