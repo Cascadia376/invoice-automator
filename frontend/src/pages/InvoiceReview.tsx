@@ -578,7 +578,7 @@ export default function InvoiceReview() {
                     <span>Approve</span>
                   </button>
 
-                  {invoice.status === 'approved' && !invoice.isPosted && (
+                  {invoice.status === 'approved' && (!invoice.isPosted || !invoice.stellarAsnNumber) && (
                     <button
                       onClick={handlePostToPos}
                       disabled={isPosting}
@@ -590,7 +590,7 @@ export default function InvoiceReview() {
                     </button>
                   )}
 
-                  {invoice.isPosted && (
+                  {invoice.isPosted && invoice.stellarAsnNumber && (
                     <div className="flex flex-col items-end gap-1">
                       <div className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-green-700 bg-green-50 rounded-lg border border-green-200 shadow-sm">
                         <CheckCircle2 className="h-4 w-4" />
