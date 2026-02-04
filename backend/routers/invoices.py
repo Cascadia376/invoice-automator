@@ -441,6 +441,16 @@ async def post_invoice_to_pos(
     # Attempt to post to Stellar
     # We use strict mode (require_config=True) because this is a user-initiated action
     try:
+        # Auto-map vendor if not configured
+        vendor = None
+        if db_invoice.vendor_id:
+            vendor = db.query(models.Vendor).filter(models.Vendor.id == db_invoice.vendor_id).first()
+        elif db_invoice.vendor_name:
+            vendor = db.query(models.Vendor).filter(models.Vendor.name == db_invoice.vendor_name).first()
+            
+        if vendor:
+            await stellar_service.ensure_vendor_mapping(db, vendor)
+
         stellar_result = await stellar_service.post_invoice_if_configured(db_invoice, db, require_config=True)
         
         # If successful (or if logic allowed skipping without error, which shouldn't happen with require_config=True)

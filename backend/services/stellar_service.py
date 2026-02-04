@@ -74,6 +74,77 @@ def generate_stellar_csv(line_items: List[models.LineItem]) -> BytesIO:
     return csv_bytes
 
 
+async def ensure_vendor_mapping(
+    db: Session, 
+    vendor: models.Vendor
+) -> Optional[str]:
+    """
+    Check if vendor is mapped to Stellar. If not, attempt to auto-discover 
+    and map based on exact name match.
+    
+    Returns:
+        The stellar_supplier_id if mapped/found, else None.
+    """
+    if vendor.stellar_supplier_id:
+        return vendor.stellar_supplier_id
+        
+    logger.info(f"Vendor '{vendor.name}' not mapped. Attempting auto-discovery in Stellar...")
+    
+    try:
+        # 1. Search Stellar
+        results = await search_stellar_suppliers(query=vendor.name)
+        
+        # Normalize result structure
+        candidates = []
+        if isinstance(results, dict):
+            if 'result' in results:
+                candidates = results['result']
+            elif 'data' in results:
+                candidates = results['data']
+            else:
+                candidates = results
+        elif isinstance(results, list):
+            candidates = results
+            
+        if not candidates:
+            logger.info(f"Auto-discovery failed: No results found for '{vendor.name}'")
+            return None
+            
+        # 2. Filter for high-confidence matches
+        # Exact name match (case-insensitive)
+        matches = []
+        for c in candidates:
+            c_name = c.get('name', '').strip()
+            if c_name.lower() == vendor.name.lower().strip():
+                matches.append(c)
+                
+        # 3. Decision
+        if len(matches) == 1:
+            match = matches[0]
+            new_id = str(match.get('id'))
+            new_name = match.get('name')
+            
+            logger.info(f"Auto-discovery SUCCESS: Mapped '{vendor.name}' -> Stellar ID {new_id} ({new_name})")
+            
+            vendor.stellar_supplier_id = new_id
+            vendor.stellar_supplier_name = new_name
+            db.commit()
+            db.refresh(vendor)
+            return new_id
+            
+        elif len(matches) > 1:
+            logger.warning(f"Auto-discovery AMBIGUOUS: Found {len(matches)} exact matches for '{vendor.name}'. Manual selection required.")
+            return None
+            
+        else:
+             # Try Alias match? (Future improvement)
+             logger.info(f"Auto-discovery failed: No exact match found for '{vendor.name}' among {len(candidates)} candidates.")
+             return None
+             
+    except Exception as e:
+        logger.error(f"Auto-discovery error for '{vendor.name}': {str(e)}")
+        return None
+
 async def post_invoice_to_stellar(
     invoice: models.Invoice,
     db: Session,
