@@ -442,14 +442,21 @@ async def post_invoice_to_pos(
     # We use strict mode (require_config=True) because this is a user-initiated action
     try:
         # Auto-map vendor if not configured
+        # Use robust lookup (handles aliases like "Inc", "Ltd")
         vendor = None
         if db_invoice.vendor_id:
             vendor = db.query(models.Vendor).filter(models.Vendor.id == db_invoice.vendor_id).first()
         elif db_invoice.vendor_name:
-            vendor = db.query(models.Vendor).filter(models.Vendor.name == db_invoice.vendor_name).first()
+            vendor = vendor_service.find_vendor_by_name(db, db_invoice.vendor_name, ctx.org_id)
             
         if vendor:
+            # If we found the vendor object, ensure it's mapped to Stellar
+            # This handles cases where vendor exists in DB but has no Stellar ID
             await stellar_service.ensure_vendor_mapping(db, vendor)
+        else:
+            # If we didn't find the vendor in our DB, we might want to auto-create it?
+            # For now, just logging. post_invoice_if_configured will likely fail.
+            logger.warning(f"Could not resolve vendor '{db_invoice.vendor_name}' for auto-mapping.")
 
         stellar_result = await stellar_service.post_invoice_if_configured(db_invoice, db, require_config=True)
         
