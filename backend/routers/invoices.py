@@ -9,6 +9,9 @@ import csv
 import io
 import fitz # PyMuPDF
 import tempfile
+import logging
+
+logger = logging.getLogger(__name__)
 
 import models, schemas, auth
 from database import get_db
@@ -435,26 +438,27 @@ async def post_invoice_to_pos(
     if db_invoice is None:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
-    # Mark as posted in our system
-    db_invoice.is_posted = True
-    db_invoice.status = 'posted'
-    
-    # Attempt to post to Stellar if configured
-    stellar_result = None
-    stellar_error = None
-    
+    # Attempt to post to Stellar
+    # We use strict mode (require_config=True) because this is a user-initiated action
     try:
-        stellar_result = await stellar_service.post_invoice_if_configured(db_invoice, db)
-        if stellar_result:
-            logger.info(f"Successfully posted invoice {invoice_id} to Stellar")
+        stellar_result = await stellar_service.post_invoice_if_configured(db_invoice, db, require_config=True)
+        
+        # If successful (or if logic allowed skipping without error, which shouldn't happen with require_config=True)
+        db_invoice.is_posted = True
+        db_invoice.status = 'posted'
+        logger.info(f"Successfully posted invoice {invoice_id} to Stellar")
+        
     except stellar_service.StellarError as e:
-        # Log the error but don't fail the entire request
-        # The invoice is still marked as posted in our system
-        stellar_error = str(e)
-        logger.error(f"Failed to post invoice {invoice_id} to Stellar: {stellar_error}")
+        # If posting fails, we do NOT celebrate.
+        # We ensure is_posted is False (just in case)
+        db_invoice.is_posted = False
+        # And we re-raise as a 400 bad request so the UI knows it failed
+        logger.error(f"Failed to post invoice {invoice_id} to Stellar: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+        
     except Exception as e:
-        stellar_error = f"Unexpected error: {str(e)}"
         logger.exception(f"Unexpected error posting invoice {invoice_id} to Stellar")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
     
     db.commit()
     db.refresh(db_invoice)
@@ -468,13 +472,7 @@ async def post_invoice_to_pos(
     if store:
         db_invoice.stellar_tenant = store.stellar_tenant
     
-    # Add Stellar status to response (not in schema, but useful for debugging)
-    response_data = db_invoice
-    if stellar_error:
-        # Could add this to a response header or log it
-        logger.warning(f"Invoice {invoice_id} posted locally but Stellar sync failed: {stellar_error}")
-         
-    return response_data
+    return db_invoice
 
 @router.patch("/bulk-post")
 def bulk_post_invoices(

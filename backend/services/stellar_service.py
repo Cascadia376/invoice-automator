@@ -249,14 +249,23 @@ def get_stellar_config_for_vendor(vendor_name: str, db: Session) -> Optional[Dic
 
 async def post_invoice_if_configured(
     invoice: models.Invoice,
-    db: Session
+    db: Session,
+    require_config: bool = False
 ) -> Optional[Dict]:
     """
     Post invoice to Stellar if vendor and store are properly configured.
+    
+    Args:
+        invoice: Invoice to post
+        db: Database session
+        require_config: If True, raise StellarError when configuration is missing instead of returning None
     """
     # Check if Stellar is globally enabled via token
     if not STELLAR_API_TOKEN:
-        logger.debug("Stellar integration not configured (missing STELLAR_API_TOKEN)")
+        msg = "Stellar integration not configured (missing STELLAR_API_TOKEN)"
+        if require_config:
+            raise StellarError(msg)
+        logger.debug(msg)
         return None
     
     # Get store configuration for overrides
@@ -270,7 +279,10 @@ async def post_invoice_if_configured(
     if store:
         # If store specifically disables Stellar, don't post
         if hasattr(store, 'stellar_enabled') and store.stellar_enabled is False:
-            logger.debug(f"Stellar specifically disabled for store {store.name}")
+            msg = f"Stellar specifically disabled for store {store.name}"
+            if require_config:
+                raise StellarError(msg)
+            logger.debug(msg)
             return None
             
         tenant_id = getattr(store, 'stellar_tenant', None)
@@ -279,7 +291,10 @@ async def post_invoice_if_configured(
     # Get vendor configuration
     vendor_config = get_stellar_config_for_vendor(invoice.vendor_name, db)
     if not vendor_config:
-        logger.info(f"Stellar not configured for vendor {invoice.vendor_name}")
+        msg = f"Stellar not configured for vendor {invoice.vendor_name}"
+        if require_config:
+            raise StellarError(msg)
+        logger.info(msg)
         return None
     
     # Post to Stellar using store overrides if present
