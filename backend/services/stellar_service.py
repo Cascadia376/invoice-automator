@@ -88,10 +88,27 @@ async def ensure_vendor_mapping(
     if vendor.stellar_supplier_id:
         return vendor.stellar_supplier_id
         
-    logger.info(f"Vendor '{vendor.name}' not mapped. Attempting auto-discovery in Stellar...")
+    logger.info(f"Vendor '{vendor.name}' not mapped. Checking Global Registry & Attempting auto-discovery...")
+
+    # 1. Check Global/Trusted Mapping Registry first
+    try:
+        global_map = db.query(models.GlobalVendorMapping).filter(
+            models.GlobalVendorMapping.vendor_name == vendor.name
+        ).first()
+
+        if global_map and global_map.stellar_supplier_id:
+            logger.info(f"Global mapping FOUND: '{vendor.name}' -> {global_map.stellar_supplier_id} ({global_map.stellar_supplier_name})")
+            vendor.stellar_supplier_id = global_map.stellar_supplier_id
+            vendor.stellar_supplier_name = global_map.stellar_supplier_name
+            db.commit()
+            db.refresh(vendor)
+            return vendor.stellar_supplier_id
+    except Exception as e:
+        logger.error(f"Error checking global mapping: {e}")
     
     try:
-        # 1. Search Stellar
+        # 2. Search Stellar
+        logger.info(f"Attempting auto-discovery in Stellar for '{vendor.name}'...")
         results = await search_stellar_suppliers(query=vendor.name)
         
         # Normalize result structure

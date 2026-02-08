@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 import models, schemas, auth
 from database import get_db
-from services import parser, textract_service, vendor_service, product_service, storage, validation_service, export_service, ldb_service, ldb_parser, splitting_service
+from services import parser, textract_service, vendor_service, product_service, storage, validation_service, export_service, ingestion_service, ldb_service, ldb_parser, splitting_service
 from services.textract_service import parse_float
 
 router = APIRouter(
@@ -63,111 +63,6 @@ async def upload_invoice(
         else:
             files_to_process = [original_temp_path]
 
-        created_invoices = []
-
-        # 2. Process each file
-        for i, current_file_path in enumerate(files_to_process):
-            print(f"STAGE 2.{i+1}: Processing file {i+1}/{len(files_to_process)}: {current_file_path}")
-            current_file_id = str(uuid.uuid4())
-            current_ext = os.path.splitext(current_file_path)[1]
-            
-            # Upload to S3
-            s3_key = f"invoices/{ctx.org_id}/{current_file_id}{current_ext}"
-            print(f"STAGE 2.{i+1}.1: Uploading to S3: {s3_key}")
-            storage.upload_file(current_file_path, s3_key)
-            
-            # Parse File
-            print(f"STAGE 2.{i+1}.2: Parsing file...")
-            if current_ext.lower() == ".xlsx":
-                 extracted_data = ldb_parser.parse_ldb_xlsx(current_file_path)
-                 extracted_data["vendor_name"] = "LDB"
-            else:
-                 s3_bucket = os.getenv("AWS_BUCKET_NAME", "swift-invoice-zen-uploads")
-                 extracted_data = parser.extract_invoice_data(current_file_path, ctx.org_id, s3_key=s3_key, s3_bucket=s3_bucket)
-            
-            print(f"STAGE 2.{i+1}.3: Vendor handling...")
-            vendor_name = extracted_data.get("vendor_name", "Unknown Vendor")
-            vendor = vendor_service.get_or_create_vendor(db, vendor_name, ctx.org_id)
-            extracted_data = vendor_service.apply_vendor_corrections(db, extracted_data, vendor)
-            
-            # DISABLED: Product validation (was causing 500 errors with wrong table)
-            # print(f"STAGE 2.{i+1}.4: Item validation...")
-            # for item in extracted_data.get("line_items", []):
-            #     validation = product_service.validate_item_against_master(db, ctx.org_id, item)
-            #     if validation["status"] == "success" and validation["flags"]:
-            #         if validation.get("master_category"):
-            #             item["category_gl_code"] = validation["master_category"]
-            
-            # Create DB Entry
-            print(f"STAGE 2.{i+1}.5: Creating DB entries...")
-            db_invoice = models.Invoice(
-                id=current_file_id,
-                organization_id=ctx.org_id,
-                invoice_number=extracted_data.get("invoice_number", "UNKNOWN"),
-                vendor_name=extracted_data.get("vendor_name", "Unknown Vendor"),
-                date=extracted_data.get("date"),
-                total_amount=extracted_data.get("total_amount", 0.0),
-                subtotal=extracted_data.get("subtotal", 0.0),
-                shipping_amount=extracted_data.get("shipping_amount", 0.0),
-                discount_amount=extracted_data.get("discount_amount", 0.0),
-                tax_amount=extracted_data.get("tax_amount", 0.0),
-                deposit_amount=extracted_data.get("deposit_amount", 0.0),
-                currency=extracted_data.get("currency", "CAD"),
-                po_number=extracted_data.get("po_number"),
-                status="needs_review",
-                file_url=s3_key,
-                raw_extraction_results=extracted_data.get("raw_extraction_results"),
-                vendor_id=vendor.id
-            )
-
-            line_items_data = extracted_data.get("line_items", [])
-            for item in line_items_data:
-                sku = item.get("sku")
-                category_gl_code = item.get("category_gl_code")
-                
-                if sku and not category_gl_code:
-                    try:
-                        mapping = db.query(models.SKUCategoryMapping).filter(
-                            models.SKUCategoryMapping.sku == sku,
-                            models.SKUCategoryMapping.organization_id == ctx.org_id
-                        ).order_by(models.SKUCategoryMapping.usage_count.desc()).first()
-                        if mapping:
-                            category_gl_code = mapping.category_gl_code
-                    except Exception as e:
-                        print(f"WARNING: SKU mapping lookup error: {e}")
-                
-                db_item = models.LineItem(
-                    id=str(uuid.uuid4()), 
-                    invoice_id=current_file_id, 
-                    sku=sku,
-                    description=item.get("description", "Item"),
-                    units_per_case=textract_service.parse_float(item.get("units_per_case", 1.0)),
-                    cases=textract_service.parse_float(item.get("cases", 0.0)),
-                    quantity=textract_service.parse_float(item.get("quantity", 1.0)),
-                    case_cost=textract_service.parse_float(item.get("case_cost")) if item.get("case_cost") is not None else None,
-                    unit_cost=textract_service.parse_float(item.get("unit_cost", 0.0)),
-                    amount=textract_service.parse_float(item.get("amount", 0.0)),
-                    category_gl_code=category_gl_code,
-                    confidence_score=textract_service.parse_float(item.get("confidence_score", 1.0))
-                )
-                db_invoice.line_items.append(db_item)
-            
-            print(f"STAGE 2.{i+1}.6: Committing to DB...")
-            db.add(db_invoice)
-            db.commit()
-            db.refresh(db_invoice)
-            
-            # Point to proxy endpoint
-            db_invoice.file_url = f"/api/invoices/{db_invoice.id}/file"
-            created_invoices.append(db_invoice)
-             
-        # Cleanup temp files if they are splits
-        if len(files_to_process) > 1:
-            for p in files_to_process:
-                if os.path.exists(p) and "splits" in p:
-                    os.remove(p)
-        if os.path.exists(original_temp_path):
-            os.remove(original_temp_path)
 
         return created_invoices
     except Exception as e:

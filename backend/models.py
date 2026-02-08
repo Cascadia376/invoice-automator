@@ -312,3 +312,16 @@ class UserRole(Base):
     organization_id = Column(String, primary_key=True, index=True) # Roles are org-specific
     
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class Job(Base):
+    __tablename__ = "jobs"
+
+    id = Column(String, primary_key=True, index=True)
+    type = Column(String, index=True)
+    status = Column(String, default="pending", index=True) # pending, running, completed, failed
+    payload = Column(String, nullable=True) # JSON payload
+    result = Column(String, nullable=True) # JSON result
+    error = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)

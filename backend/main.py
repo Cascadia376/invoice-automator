@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
 import traceback
-import models, database
+import models, database, jobs
 from routers import invoices, vendors, gl_categories, debug, issues, admin, auth_router, stellar, reports
 import auth
 
