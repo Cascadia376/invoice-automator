@@ -395,9 +395,6 @@ async def post_invoice_if_configured(
         location_id=location_id
     )
 
-
-        return None
-
 def check_invoice_preflight(db: Session, invoice_ids: List[str]) -> Dict:
     """
     Check if invoices are ready to be posted to Stellar.
