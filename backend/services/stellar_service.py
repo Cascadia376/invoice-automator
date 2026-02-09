@@ -453,14 +453,23 @@ def check_invoice_preflight(db: Session, invoice_ids: List[str]) -> Dict:
              
         # Check 4: Vendor Mapping
         if not is_blocked: # Only check if not already blocked by basic status
-            vendor_config = get_stellar_config_for_vendor(inv.vendor_name, db)
-            if not vendor_config:
-                # Add to blocking vendors list
-                v_name = inv.vendor_name
-                if v_name not in blocking_vendors_map:
-                    blocking_vendors_map[v_name] = []
-                blocking_vendors_map[v_name].append(inv.id)
-                is_blocked = True
+            if not inv.vendor_name:
+                 issues.append({
+                    "invoice_id": inv.id,
+                    "issue_type": "blocking",
+                    "message": "Invoice has no Vendor Name",
+                    "action_required": "none"
+                })
+                 is_blocked = True
+            else:
+                vendor_config = get_stellar_config_for_vendor(inv.vendor_name, db)
+                if not vendor_config:
+                    # Add to blocking vendors list
+                    v_name = inv.vendor_name
+                    if v_name not in blocking_vendors_map:
+                        blocking_vendors_map[v_name] = []
+                    blocking_vendors_map[v_name].append(inv.id)
+                    is_blocked = True
             
         # Check 5: Store Configuration (Tenant/Location)
         # Verify if store has credentials or override

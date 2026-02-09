@@ -73,6 +73,93 @@ async def upload_invoice(
 
 from sqlalchemy import or_
 
+# --- Stellar Routes (Must be before /{invoice_id}) ---
+
+@router.post("/preflight-post", response_model=schemas.PreflightResponse)
+def preflight_post_invoices(
+    invoice_ids: List[str],
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """
+    Check if invoices are ready for Stellar posting.
+    Returns list of ready IDs, issues, and blocking vendor resolutions.
+    """
+    from services import stellar_service
+    return stellar_service.check_invoice_preflight(db, invoice_ids)
+
+@router.patch("/bulk-post")
+async def bulk_post_invoices(
+    invoice_ids: List[str],
+    background_tasks: BackgroundTasks, # Use BG tasks for speed if many? No, user wants direct feedback.
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """
+    Strict bulk post. 
+    1. Runs preflight check internally (sanity check)
+    2. Posts 'ready' invoices
+    3. Returns results per invoice
+    """
+    from services import stellar_service
+    
+    # 1. Sanity Check
+    preflight = stellar_service.check_invoice_preflight(db, invoice_ids)
+    
+    results = {
+        "success": [],
+        "failed": [],
+        "skipped": [] # Issues/Blocking
+    }
+    
+    # Process attributes from preflight
+    # ready_ids are safe to post
+    
+    for inv_id in preflight["ready_ids"]:
+        try:
+             # Fetch invoice again to be safe/clean context
+             db_inv = db.query(models.Invoice).filter(models.Invoice.id == inv_id).first()
+             if not db_inv: 
+                 continue
+                 
+             # Direct Post
+             # We assume mapping exists because it passed preflight
+             stellar_result = await stellar_service.post_invoice_if_configured(db_inv, db, require_config=True)
+             
+             db_inv.is_posted = True
+             db_inv.status = 'posted'
+             db.commit()
+             
+             results["success"].append({
+                 "id": inv_id,
+                 "asn": db_inv.stellar_asn_number
+             })
+             
+        except Exception as e:
+            logger.error(f"Bulk post failed for {inv_id}: {e}")
+            results["failed"].append({
+                "id": inv_id,
+                "reason": str(e)
+            })
+            
+    # Add skipped info
+    for issue in preflight["issues"]:
+        results["failed"].append({
+            "id": issue["invoice_id"],
+            "reason": f"{issue['issue_type']}: {issue['message']}"
+        })
+        
+    for block in preflight["blocking_vendors"]:
+        for inv_id in block["invoice_ids"]:
+             results["failed"].append({
+                "id": inv_id,
+                "reason": f"Vendor '{block['vendor_name']}' unmapped"
+            })
+
+    return {"status": "completed", "results": results}
+
+
+
 @router.get("", response_model=schemas.InvoiceListResponse)
 def read_invoices(
     skip: int = 0, 
@@ -386,92 +473,7 @@ async def post_invoice_to_pos(
     
     return db_invoice
 
-@router.post("/preflight-post", response_model=schemas.PreflightResponse)
-def preflight_post_invoices(
-    invoice_ids: List[str],
-    db: Session = Depends(get_db),
-    ctx: auth.UserContext = Depends(auth.get_current_user)
-):
-    """
-    Check if invoices are ready for Stellar posting.
-    Returns list of ready IDs, issues, and blocking vendor resolutions.
-    """
-    from services import stellar_service
-    return stellar_service.check_invoice_preflight(db, invoice_ids)
 
-@router.patch("/bulk-post")
-async def bulk_post_invoices(
-    invoice_ids: List[str],
-    background_tasks: BackgroundTasks, # Use BG tasks for speed if many? No, user wants direct feedback.
-    db: Session = Depends(get_db),
-    ctx: auth.UserContext = Depends(auth.get_current_user)
-):
-    """
-    Strict bulk post. 
-    1. Runs preflight check internally (sanity check)
-    2. Posts 'ready' invoices
-    3. Returns results per invoice
-    """
-    from services import stellar_service
-    
-    # 1. Sanity Check
-    preflight = stellar_service.check_invoice_preflight(db, invoice_ids)
-    
-    # If ANY blocking issues exist, we should probably reject the whole batch 
-    # OR we just process the 'ready' ones. 
-    # The UI should have handled resolutions, so we expect mostly success.
-    
-    results = {
-        "success": [],
-        "failed": [],
-        "skipped": [] # Issues/Blocking
-    }
-    
-    # Process attributes from preflight
-    # ready_ids are safe to post
-    
-    for inv_id in preflight["ready_ids"]:
-        try:
-             # Fetch invoice again to be safe/clean context
-             db_inv = db.query(models.Invoice).filter(models.Invoice.id == inv_id).first()
-             if not db_inv: 
-                 continue
-                 
-             # Direct Post
-             # We assume mapping exists because it passed preflight
-             stellar_result = await stellar_service.post_invoice_if_configured(db_inv, db, require_config=True)
-             
-             db_inv.is_posted = True
-             db_inv.status = 'posted'
-             db.commit()
-             
-             results["success"].append({
-                 "id": inv_id,
-                 "asn": db_inv.stellar_asn_number
-             })
-             
-        except Exception as e:
-            logger.error(f"Bulk post failed for {inv_id}: {e}")
-            results["failed"].append({
-                "id": inv_id,
-                "reason": str(e)
-            })
-            
-    # Add skipped info
-    for issue in preflight["issues"]:
-        results["failed"].append({
-            "id": issue["invoice_id"],
-            "reason": f"{issue['issue_type']}: {issue['message']}"
-        })
-        
-    for block in preflight["blocking_vendors"]:
-        for inv_id in block["invoice_ids"]:
-             results["failed"].append({
-                "id": inv_id,
-                "reason": f"Vendor '{block['vendor_name']}' unmapped"
-            })
-
-    return {"status": "completed", "results": results}
 
 @router.get("/stats/category-summary")
 def get_category_summary(
