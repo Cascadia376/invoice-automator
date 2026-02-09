@@ -410,3 +410,8 @@ class PreflightResponse(BaseModel):
         "populate_by_name": True,
         "alias_generator": to_camel
     }
+
+class VendorLinkStellarRequest(BaseModel):
+    vendor_name: str
+    stellar_supplier_id: str
+    stellar_supplier_name: str
