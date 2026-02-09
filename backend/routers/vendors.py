@@ -181,3 +181,61 @@ def delete_vendor(
     db.commit()
     
     return {"status": "success", "message": "Vendor deleted"}
+
+@router.post("/link-stellar-by-name")
+def link_stellar_by_name(
+    link_data: schemas.VendorLinkStellarRequest,
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """
+    Link a vendor to a Stellar Supplier by Name.
+    If the vendor doesn't exist, it creates it.
+    Also updates the Global Registry.
+    """
+    # 1. Find or Create Vendor
+    vendor = vendor_service.find_vendor_by_name(db, link_data.vendor_name, ctx.org_id)
+    
+    if not vendor:
+        # Create new vendor
+        vendor = models.Vendor(
+            id=str(uuid.uuid4()),
+            organization_id=ctx.org_id,
+            name=link_data.vendor_name,
+            stellar_supplier_id=link_data.stellar_supplier_id,
+            stellar_supplier_name=link_data.stellar_supplier_name
+        )
+        db.add(vendor)
+    else:
+        # Update existing
+        vendor.stellar_supplier_id = link_data.stellar_supplier_id
+        vendor.stellar_supplier_name = link_data.stellar_supplier_name
+        vendor.updated_at = datetime.utcnow()
+        
+    db.commit()
+    db.refresh(vendor)
+    
+    # 2. Update Global Registry (Always)
+    try:
+        existing_global = db.query(models.GlobalVendorMapping).filter(
+            models.GlobalVendorMapping.vendor_name == link_data.vendor_name
+        ).first()
+        
+        if existing_global:
+            existing_global.stellar_supplier_id = link_data.stellar_supplier_id
+            existing_global.stellar_supplier_name = link_data.stellar_supplier_name
+            existing_global.updated_at = datetime.utcnow()
+        else:
+            new_global = models.GlobalVendorMapping(
+                id=str(uuid.uuid4()),
+                vendor_name=link_data.vendor_name,
+                stellar_supplier_id=link_data.stellar_supplier_id,
+                stellar_supplier_name=link_data.stellar_supplier_name
+            )
+            db.add(new_global)
+        db.commit()
+    except Exception as e:
+        print(f"Failed to update global registry during link: {e}")
+        # Don't fail the request, just log
+        
+    return {"status": "success", "message": f"Linked '{link_data.vendor_name}' to Stellar Supplier"}

@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { Search, Plus, Inbox, Beaker, MoreVertical, AlertCircle, Clock, FileText, FileDown, Trash2, CheckCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
+import { StellarPostModal } from "@/components/invoice/StellarPostModal";
+
 export default function Dashboard() {
     const {
         invoices, refreshInvoices, totalCount, currentPage, pageSize, setPage, deleteInvoice, updateInvoice, stats
@@ -16,6 +18,9 @@ export default function Dashboard() {
     const [statusFilter, setStatusFilter] = useState<'all' | 'needs_review' | 'approved' | 'posted' | 'failed' | 'issue'>('all');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isLoading, setIsLoading] = useState(false);
+
+    // Stellar Modal State
+    const [showStellarModal, setShowStellarModal] = useState(false);
 
     // Debounced search effect
     useEffect(() => {
@@ -131,45 +136,13 @@ export default function Dashboard() {
         toast.success("Invoices rejected");
     };
 
-    const handleBulkPostToPos = async () => {
-        const ids = Array.from(selectedIds);
-        const approvedIds = invoices
-            .filter(i => ids.includes(i.id) && i.status === 'approved')
-            .map(i => i.id);
-
-        if (approvedIds.length === 0) {
-            toast.error("Only approved invoices can be posted to POS");
+    const handleBulkPostToPos = () => {
+        if (selectedIds.size === 0) {
+            toast.error("No invoices selected");
             return;
         }
-
-        if (approvedIds.length < ids.length) {
-            if (!confirm(`${ids.length - approvedIds.length} selected invoices are not approved and will be skipped. Continue?`)) return;
-        }
-
-        setIsLoading(true);
-        try {
-            const token = await getToken();
-            const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
-            const response = await fetch(`${API_BASE}/api/invoices/bulk-post`, {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify(approvedIds)
-            });
-
-            if (!response.ok) throw new Error("Bulk post failed");
-
-            toast.success(`Marked ${approvedIds.length} invoices as posted`);
-            setSelectedIds(new Set());
-            // Refresh invoices to show updated state
-            refreshInvoices(0, pageSize, searchTerm, statusFilter);
-        } catch (error: any) {
-            toast.error(`Post failed: ${error.message}`);
-        } finally {
-            setIsLoading(false);
-        }
+        // Open the orchestator modal
+        setShowStellarModal(true);
     };
 
     const handleLoadDemo = async () => {
@@ -319,7 +292,16 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-6">
-
+            <StellarPostModal
+                open={showStellarModal}
+                invoiceIds={Array.from(selectedIds)}
+                onClose={() => setShowStellarModal(false)}
+                onSuccess={() => {
+                    setShowStellarModal(false);
+                    setSelectedIds(new Set());
+                    refreshInvoices(0, pageSize, searchTerm, statusFilter);
+                }}
+            />
 
             <div className="flex flex-wrap justify-between items-center gap-4">
                 <p className="text-3xl font-black leading-tight tracking-[-0.033em] text-gray-900">Dashboard</p>

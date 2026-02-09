@@ -396,6 +396,110 @@ async def post_invoice_if_configured(
     )
 
 
+        return None
+
+def check_invoice_preflight(db: Session, invoice_ids: List[str]) -> Dict:
+    """
+    Check if invoices are ready to be posted to Stellar.
+    
+    Returns:
+        Dict with keys:
+        - ready_ids: List of IDs that are good to go
+        - issues: List of specific errors (id, type, message)
+        - blocking_vendors: List of unmapped vendors needing resolution
+    """
+    ready_ids = []
+    issues = []
+    blocking_vendors_map = {} # vendor_name -> list of invoice_ids
+
+    # 1. Fetch all invoices
+    invoices = db.query(models.Invoice).filter(models.Invoice.id.in_(invoice_ids)).all()
+    
+    # 2. Get Store Configuration (Optimize by fetching relevant stores)
+    # Assuming single org for now, or we check each invoice's store
+    # For now, we'll check per invoice to be safe
+    
+    for inv in invoices:
+        is_blocked = False
+        
+        # Check 1: Status
+        if inv.status != 'approved':
+            issues.append({
+                "invoice_id": inv.id,
+                "issue_type": "blocking", 
+                "message": f"Invoice status is '{inv.status}', must be 'approved'",
+                "action_required": "approve_invoice"
+            })
+            is_blocked = True
+            
+        # Check 2: Idempotency
+        if inv.is_posted or inv.stellar_asn_number:
+             issues.append({
+                "invoice_id": inv.id, 
+                "issue_type": "warning", 
+                "message": f"Already posted (ASN: {inv.stellar_asn_number})",
+                "action_required": "none"
+            })
+             # We assume we shouldn't post again, so it's not 'ready' but handled as a separate category?
+             # Actually, simpler to just treat as 'blocking' for the POST action.
+             is_blocked = True
+
+        # Check 3: Line Items
+        if not inv.line_items:
+             issues.append({
+                "invoice_id": inv.id,
+                "issue_type": "blocking",
+                "message": "No line items found",
+                "action_required": "none"
+            })
+             is_blocked = True
+             
+        # Check 4: Vendor Mapping
+        if not is_blocked: # Only check if not already blocked by basic status
+            vendor_config = get_stellar_config_for_vendor(inv.vendor_name, db)
+            if not vendor_config:
+                # Add to blocking vendors list
+                v_name = inv.vendor_name
+                if v_name not in blocking_vendors_map:
+                    blocking_vendors_map[v_name] = []
+                blocking_vendors_map[v_name].append(inv.id)
+                is_blocked = True
+            
+        # Check 5: Store Configuration (Tenant/Location)
+        # Verify if store has credentials or override
+        if not is_blocked:
+            store = db.query(models.Store).filter(models.Store.organization_id == inv.organization_id).first()
+            tenant = getattr(store, 'stellar_tenant', None) or STELLAR_TENANT_ID
+            location = getattr(store, 'stellar_location_id', None) or STELLAR_LOCATION_ID
+            
+            if not tenant or not location:
+                 issues.append({
+                    "invoice_id": inv.id,
+                    "issue_type": "blocking",
+                    "message": "Missing Stellar Tenant/Location configuration",
+                    "action_required": "check_config"
+                })
+                 is_blocked = True
+
+        if not is_blocked:
+            ready_ids.append(inv.id)
+
+    # Format blocking vendors for response
+    blocking_vendors_list = []
+    for v_name, ids in blocking_vendors_map.items():
+        blocking_vendors_list.append({
+            "vendor_name": v_name,
+            "invoice_ids": ids,
+            "message": f"Vendor '{v_name}' is not mapped to a Stellar Supplier"
+        })
+
+    return {
+        "ready_ids": ready_ids,
+        "issues": issues,
+        "blocking_vendors": blocking_vendors_list
+    }
+
+
 async def search_stellar_suppliers(
     query: str = "",
     tenant_id: Optional[str] = None,

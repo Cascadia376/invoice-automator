@@ -89,3 +89,27 @@ export interface DashboardStats {
   issueCount: number;
   timeSaved: string;
 }
+
+export interface PreflightIssue {
+  invoiceId: string;
+  issueType: 'blocking' | 'warning';
+  message: string;
+  actionRequired?: string;
+}
+
+export interface VendorResolutionInfo {
+  invoiceIds: string[];
+  vendorName: string;
+  message: string;
+}
+
+export interface PreflightResponse {
+  readyIds: string[];
+  issues: PreflightIssue[];
+  blockingVendors: VendorResolutionInfo[];
+}
+
+export interface BulkPostResult {
+  success: { id: string; asn: string }[];
+  failed: { id: string; reason: string }[];
+}

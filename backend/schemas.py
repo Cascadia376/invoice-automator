@@ -388,3 +388,25 @@ class Issue(IssueBase):
         "populate_by_name": True,
         "alias_generator": to_camel
     }
+
+# Stellar Preflight Schemas
+class PreflightIssue(BaseModel):
+    invoice_id: str
+    issue_type: str  # blocking, warning
+    message: str
+    action_required: Optional[str] = None # map_vendor, check_config, none
+
+class VendorResolutionInfo(BaseModel):
+    invoice_ids: List[str]
+    vendor_name: str
+    message: str
+
+class PreflightResponse(BaseModel):
+    ready_ids: List[str]
+    issues: List[PreflightIssue]
+    blocking_vendors: List[VendorResolutionInfo]
+    
+    model_config = {
+        "populate_by_name": True,
+        "alias_generator": to_camel
+    }

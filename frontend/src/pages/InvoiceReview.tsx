@@ -29,10 +29,12 @@ import "driver.js/dist/driver.css";
 import { useLocalDraft } from "@/hooks/useLocalDraft";
 import { useAuth } from "@/context/AuthContext";
 
+import { StellarPostModal } from "@/components/invoice/StellarPostModal";
+
 export default function InvoiceReview() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getInvoice, updateInvoice, invoices, isLoading } = useInvoice();
+  const { getInvoice, updateInvoice, invoices, isLoading, refreshInvoices } = useInvoice();
   const { getToken } = useAuth();
   const [invoice, setInvoice] = useState<Invoice | undefined>(undefined);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -41,6 +43,9 @@ export default function InvoiceReview() {
   const { saveDraft, getDraft, clearDraft, hasDraft } = useLocalDraft();
   const [isPosting, setIsPosting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Stellar Modal State
+  const [showStellarModal, setShowStellarModal] = useState(false);
 
   // Highlight State
   const [highlights, setHighlights] = useState<Record<string, any[]>>({});
@@ -59,6 +64,29 @@ export default function InvoiceReview() {
   const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
 
   // Main Data Load
+  const fetchInvoiceData = async () => {
+    if (!id) return;
+    // We will try to fetch fresh data
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/api/invoices/${id}`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setInvoice(data);
+      } else {
+        // Fallback to context
+        const data = getInvoice(id);
+        if (data) setInvoice(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch fresh invoice", e);
+      const data = getInvoice(id);
+      if (data) setInvoice(data);
+    }
+  };
+
   useEffect(() => {
     if (id) {
       const data = getInvoice(id);
@@ -88,12 +116,15 @@ export default function InvoiceReview() {
         })();
       } else {
         if (!isLoading) {
-          toast.error("Invoice not found");
-          navigate("/dashboard");
+          // Try fetching directly if not in context yet? 
+          // For now, redirect.
+          toast.error("Invoice not found or loading...");
+          // navigate("/dashboard"); 
+          // Commented out navigate to prevent flashing if context is slow
         }
       }
     }
-  }, [id, getInvoice, navigate, isLoading]);
+  }, [id, getInvoice, isLoading]);
 
   // Draft Check - Only on entry or ID change
   useEffect(() => {
@@ -217,33 +248,9 @@ export default function InvoiceReview() {
     }
   };
 
-  const handlePostToPos = async () => {
+  const handlePostToPos = () => {
     if (!invoice) return;
-    setIsPosting(true);
-    try {
-      const token = await getToken();
-      const response = await fetch(`${API_BASE}/api/invoices/${invoice.id}/post`, {
-        method: 'PATCH',
-        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        setInvoice(prev => prev ? { ...prev, stellarResponse: result.detail || result.error || "Post failed" } : undefined);
-        throw new Error(result.detail || "Failed to post to POS");
-      }
-
-      setInvoice(result);
-      toast.success("Invoice successfully posted to Stellar POS", {
-        description: `ASN: ${result.stellarAsnNumber}`,
-      });
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || "Failed to post to Stellar POS");
-    } finally {
-      setIsPosting(false);
-    }
+    setShowStellarModal(true);
   };
 
   const handleSyncStellar = async () => {
@@ -267,7 +274,9 @@ export default function InvoiceReview() {
           ...prev,
           stellarAsnNumber: result.invoice.stellar_asn_number,
           stellarResponse: JSON.stringify(result.invoice.stellar_data),
-          stellarTenant: result.invoice.stellar_tenant
+          stellarTenant: result.invoice.stellar_tenant,
+          isPosted: true, // Optimistic update
+          status: 'posted'
         } : undefined);
       }
 
@@ -356,6 +365,16 @@ export default function InvoiceReview() {
 
   return (
     <div className="h-screen flex flex-col bg-background-light font-display text-gray-800">
+      <StellarPostModal
+        open={showStellarModal}
+        invoiceIds={[invoice.id]}
+        onClose={() => setShowStellarModal(false)}
+        onSuccess={() => {
+          setShowStellarModal(false);
+          fetchInvoiceData(); // Refresh current invoice data
+          refreshInvoices(0, pageSize); // Refresh global list (optional but good)
+        }}
+      />
       <header className="flex-shrink-0 border-b border-gray-200 bg-background-light">
         <div className="mx-auto w-full px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -641,5 +660,291 @@ export default function InvoiceReview() {
       </main>
       <KeyboardShortcutsDialog open={showShortcuts} onOpenChange={setShowShortcuts} />
     </div>
+  );
+}
+<div className="mx-auto w-full px-4 sm:px-6 lg:px-8">
+  <div className="flex items-center justify-between h-16">
+    <div className="flex items-center">
+      <div className="flex items-center gap-2 text-xl font-bold">
+        <div className="bg-primary p-1.5 rounded-lg flex items-center justify-center">
+          <FileText className="h-5 w-5 text-white" />
+        </div>
+        <span className="text-gray-900">Cascadia Invoice Assistant</span>
+      </div>
+    </div>
+    <div className="flex items-center gap-4">
+      {!isPdfVisible && (
+        <button
+          onClick={() => setIsPdfVisible(true)}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
+          title="Show PDF Panel"
+        >
+          <PanelLeftOpen className="h-5 w-5" />
+          <span>Show PDF</span>
+        </button>
+      )}
+
+      <button
+        onClick={() => {
+          localStorage.removeItem('hasSeenTour');
+          window.location.reload();
+        }}
+        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg flex items-center text-sm font-medium transition-colors"
+        title="Restart Product Tour"
+      >
+        <CircleHelp className="h-5 w-5" />
+      </button>
+
+      <button onClick={() => navigate("/dashboard")} className="px-4 py-2 text-sm font-medium border rounded-lg border-gray-300 text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" type="button">
+        Back
+      </button>
+      <button
+        onClick={handleExportExcel}
+        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+      >
+        <FileDown className="h-4 w-4" />
+        <span>Excel</span>
+      </button>
+
+      <button
+        onClick={async () => {
+          if (!invoice) return;
+          try {
+            const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+            const token = await getToken();
+
+            const response = await fetch(`${API_BASE}/api/invoices/${invoice.id}/export/ldb`, {
+              headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+            });
+
+            if (!response.ok) throw new Error("Report generation failed");
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = `LDB_Report.xlsx`;
+            if (contentDisposition) {
+              const matches = /filename="?([^"]+)"?/.exec(contentDisposition);
+              if (matches && matches[1]) filename = matches[1];
+            }
+
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            toast.success("LDB Report downloaded");
+          } catch (error: any) {
+            toast.error("Failed to download report");
+          }
+        }}
+        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+      >
+        <FileText className="h-4 w-4" />
+        <span>LDB Report</span>
+      </button>
+
+      <button
+        onClick={async () => {
+          const savedColumns = localStorage.getItem("csv_export_columns");
+          const savedConfig = localStorage.getItem("csv_export_config");
+
+          const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+          // Token is already awaited due to 'await' keyword but verify context
+          const token = await getToken();
+
+          let url = `${API_BASE}/api/invoices/${invoice.id}/export/csv`;
+
+          // Construct columns mapping
+          if (savedColumns) {
+            const enabledColumns = JSON.parse(savedColumns) as string[];
+            const configMap = savedConfig ? JSON.parse(savedConfig) : {};
+
+            // Create object: { "Internal Name": "Custom Header" }
+            const exportMap: Record<string, string> = {};
+            enabledColumns.forEach(col => {
+              exportMap[col] = configMap[col] || col;
+            });
+
+            url += `?columns=${encodeURIComponent(JSON.stringify(exportMap))}`;
+          }
+
+          try {
+            const response = await fetch(url, {
+              headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+            });
+
+            if (!response.ok) throw new Error('Export failed');
+
+            const blob = await response.blob();
+            const objectUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = objectUrl;
+            a.download = `invoice-${invoice.invoiceNumber || 'export'}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(objectUrl);
+            document.body.removeChild(a);
+
+            toast.success("CSV file has been downloaded", {
+              description: "Export Successful",
+            });
+          } catch (error) {
+            console.error('Export error:', error);
+            toast.error("Could not download CSV file", {
+              description: "Export Failed",
+            });
+          }
+        }}
+        className="px-4 py-2 text-sm font-medium border rounded-lg border-gray-300 text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary flex items-center gap-2"
+        type="button"
+      >
+        <span className="material-symbols-outlined text-base">download</span>
+        CSV
+      </button>
+    </div>
+  </div>
+</div>
+      </header >
+
+      <main className="flex-grow min-h-0">
+        <ResizablePanelGroup direction="horizontal" className="h-full w-full rounded-lg border">
+          {isPdfVisible && (
+            <>
+              <ResizablePanel defaultSize={50} minSize={30} id="tour-pdf-panel">
+                <div className="relative h-full bg-gray-50 p-4 md:p-6 lg:p-8 flex flex-col" id="pdf-panel">
+                  <div className="flex items-center justify-between pb-4">
+                    <h2 className="text-lg font-semibold text-gray-900">Invoice Preview</h2>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const width = 1200;
+                          const height = 800;
+                          const left = (window.screen.width / 2) - (width / 2);
+                          const top = (window.screen.height / 2) - (height / 2);
+                          window.open(
+                            `/invoices/${id}/pdf?url=${encodeURIComponent(pdfUrl)}`,
+                            '_blank',
+                            `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes,status=yes`
+                          );
+                        }}
+                        className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-md transition-colors"
+                        title="Open PDF in new window"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setIsPdfVisible(false)}
+                        className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-md transition-colors"
+                        title="Hide PDF Panel"
+                      >
+                        <PanelLeftClose className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex-grow bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
+                    <PDFViewer
+                      pdfUrl={pdfUrl}
+                      highlights={activeField ? highlights[
+                        // Convert camelCase to snake_case for lookup
+                        activeField.replace(/lineItems\[(\d+)\]\.([a-zA-Z]+)/, (_, idx, field) =>
+                          `line_items[${idx}].${field.replace(/[A-Z]/g, l => `_${l.toLowerCase()}`)}`
+                        ).replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)
+                      ] || [] : []}
+                    />
+                  </div>
+                </div>
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+            </>
+          )}
+
+          <ResizablePanel defaultSize={isPdfVisible ? 50 : 100} minSize={30}>
+            <div className="flex-1 h-full p-4 md:p-6 lg:p-8 overflow-y-auto" id="tour-data-panel">
+              <InvoiceDataEditor
+                data={invoice}
+                onChange={handleDataChange}
+                onFieldFocus={(field) => setActiveField(field)}
+                validation={validationWarnings}
+              />
+
+              <div className="pt-8 border-t border-gray-200 mt-8">
+                <div className="flex justify-end gap-3" id="tour-actions">
+                  <button onClick={handleReject} className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-lg shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500" type="button">
+                    <span className="material-symbols-outlined text-base -ml-1 mr-2">close</span>
+                    <span>Reject</span>
+                  </button>
+                  <button onClick={handleApprove} className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-lg shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" type="button">
+                    <span className="material-symbols-outlined text-base -ml-1 mr-2">check</span>
+                    <span>Approve</span>
+                  </button>
+
+                  {invoice.status === 'approved' && (!invoice.isPosted || !invoice.stellarAsnNumber) && (
+                    <button
+                      onClick={handlePostToPos}
+                      disabled={isPosting}
+                      className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      type="button"
+                    >
+                      {isPosting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                      <span>{isPosting ? 'Posting to Stellar...' : 'Post to Stellar'}</span>
+                    </button>
+                  )}
+
+                  {invoice.isPosted && invoice.stellarAsnNumber && (
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-green-700 bg-green-50 rounded-lg border border-green-200 shadow-sm">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Posted to Stellar
+                      </div>
+                      <div className="flex flex-col items-end text-[10px] text-muted-foreground font-mono leading-tight pr-1">
+                        {invoice.stellarAsnNumber && (
+                          <div className="flex flex-col items-end gap-1">
+                            <span>ASN: {invoice.stellarAsnNumber}</span>
+                            {invoice.stellarTenant && (
+                              <a
+                                href={`https://${invoice.stellarTenant}.stellarpos.io/supplier-invoices/${invoice.stellarAsnNumber}/review`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 flex items-center gap-1 font-sans text-[11px] font-bold"
+                              >
+                                <span>View in Stellar</span>
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
+                          </div>
+                        )}
+                        {invoice.stellarPostedAt && <span>{new Date(invoice.stellarPostedAt).toLocaleString()}</span>}
+                      </div>
+
+                      <button
+                        onClick={handleSyncStellar}
+                        disabled={isSyncing}
+                        className="flex items-center gap-1.5 mt-1 px-2 py-1 text-[11px] font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors disabled:opacity-50"
+                      >
+                        {isSyncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCcw className="h-3 w-3" />}
+                        Sync latest from Stellar
+                      </button>
+                    </div>
+                  )}
+
+                  {invoice.stellarResponse && !invoice.isPosted && (
+                    <div className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-lg border border-red-200 mt-2 max-w-md">
+                      <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate" title={invoice.stellarResponse}>Stellar Error: {invoice.stellarResponse}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </main>
+      <KeyboardShortcutsDialog open={showShortcuts} onOpenChange={setShowShortcuts} />
+    </div >
   );
 }
