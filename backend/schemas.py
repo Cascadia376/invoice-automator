@@ -415,3 +415,8 @@ class VendorLinkStellarRequest(BaseModel):
     vendor_name: str
     stellar_supplier_id: str
     stellar_supplier_name: str
+
+    model_config = {
+        "populate_by_name": True,
+        "alias_generator": to_camel
+    }
