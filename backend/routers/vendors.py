@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List
 import uuid
@@ -183,8 +183,8 @@ def delete_vendor(
     return {"status": "success", "message": "Vendor deleted"}
 
 @router.post("/link-stellar-by-name")
-def link_stellar_by_name(
-    link_data: schemas.VendorLinkStellarRequest,
+async def link_stellar_by_name(
+    request: Request,
     db: Session = Depends(get_db),
     ctx: auth.UserContext = Depends(auth.get_current_user)
 ):
@@ -193,23 +193,33 @@ def link_stellar_by_name(
     If the vendor doesn't exist, it creates it.
     Also updates the Global Registry.
     """
+    body = await request.json()
+    print(f"DEBUG LINK STELLAR PAYLOAD: {body}")
+    
+    vendor_name = body.get("vendorName") or body.get("vendor_name")
+    stellar_supplier_id = body.get("stellarSupplierId") or body.get("stellar_supplier_id")
+    stellar_supplier_name = body.get("stellarSupplierName") or body.get("stellar_supplier_name")
+    
+    if not vendor_name or not stellar_supplier_id:
+        raise HTTPException(status_code=422, detail="Missing required fields (vendorName, stellarSupplierId)")
+
     # 1. Find or Create Vendor
-    vendor = vendor_service.find_vendor_by_name(db, link_data.vendor_name, ctx.org_id)
+    vendor = vendor_service.find_vendor_by_name(db, vendor_name, ctx.org_id)
     
     if not vendor:
         # Create new vendor
         vendor = models.Vendor(
             id=str(uuid.uuid4()),
             organization_id=ctx.org_id,
-            name=link_data.vendor_name,
-            stellar_supplier_id=link_data.stellar_supplier_id,
-            stellar_supplier_name=link_data.stellar_supplier_name
+            name=vendor_name,
+            stellar_supplier_id=stellar_supplier_id,
+            stellar_supplier_name=stellar_supplier_name
         )
         db.add(vendor)
     else:
         # Update existing
-        vendor.stellar_supplier_id = link_data.stellar_supplier_id
-        vendor.stellar_supplier_name = link_data.stellar_supplier_name
+        vendor.stellar_supplier_id = stellar_supplier_id
+        vendor.stellar_supplier_name = stellar_supplier_name
         vendor.updated_at = datetime.utcnow()
         
     db.commit()
@@ -218,19 +228,19 @@ def link_stellar_by_name(
     # 2. Update Global Registry (Always)
     try:
         existing_global = db.query(models.GlobalVendorMapping).filter(
-            models.GlobalVendorMapping.vendor_name == link_data.vendor_name
+            models.GlobalVendorMapping.vendor_name == vendor_name
         ).first()
         
         if existing_global:
-            existing_global.stellar_supplier_id = link_data.stellar_supplier_id
-            existing_global.stellar_supplier_name = link_data.stellar_supplier_name
+            existing_global.stellar_supplier_id = stellar_supplier_id
+            existing_global.stellar_supplier_name = stellar_supplier_name
             existing_global.updated_at = datetime.utcnow()
         else:
             new_global = models.GlobalVendorMapping(
                 id=str(uuid.uuid4()),
-                vendor_name=link_data.vendor_name,
-                stellar_supplier_id=link_data.stellar_supplier_id,
-                stellar_supplier_name=link_data.stellar_supplier_name
+                vendor_name=vendor_name,
+                stellar_supplier_id=stellar_supplier_id,
+                stellar_supplier_name=stellar_supplier_name
             )
             db.add(new_global)
         db.commit()
@@ -238,4 +248,4 @@ def link_stellar_by_name(
         print(f"Failed to update global registry during link: {e}")
         # Don't fail the request, just log
         
-    return {"status": "success", "message": f"Linked '{link_data.vendor_name}' to Stellar Supplier"}
+    return {"status": "success", "message": f"Linked '{vendor_name}' to Stellar Supplier"}
