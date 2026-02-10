@@ -180,7 +180,12 @@ async def sync_suppliers(
         stats = await stellar_service.sync_stellar_suppliers(db, tenant_id)
         return {"status": "success", "stats": stats}
     except stellar_service.StellarError as e:
-        # Catch specific Stellar errors (like missing token)
+        raise HTTPException(status_code=502, detail=f"Stellar API Error: {str(e)}")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Sync Error: {str(e)}")
+
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"SYNC ERROR: {e}")
