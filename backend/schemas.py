@@ -396,10 +396,20 @@ class PreflightIssue(BaseModel):
     message: str
     action_required: Optional[str] = None # map_vendor, check_config, none
 
+    model_config = {
+        "populate_by_name": True,
+        "alias_generator": to_camel
+    }
+
 class VendorResolutionInfo(BaseModel):
     invoice_ids: List[str]
     vendor_name: str
     message: str
+
+    model_config = {
+        "populate_by_name": True,
+        "alias_generator": to_camel
+    }
 
 class PreflightResponse(BaseModel):
     ready_ids: List[str]
