@@ -154,7 +154,11 @@ def update_organization(
 
     db_store = db.query(models.Store).filter(models.Store.store_id == store_id_int).first()
     if not db_store:
+        print(f"DEBUG: Organization update failed. Store ID {store_id_int} not found.")
         raise HTTPException(status_code=404, detail="Organization not found")
+
+    print(f"DEBUG: Updating store {store_id_int} ({db_store.name}). OLD Tenant: {db_store.stellar_tenant}, NEW Payload: {store_update}")
+
 
     if store_update.name is not None:
         db_store.name = store_update.name

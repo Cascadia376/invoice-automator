@@ -168,10 +168,13 @@ async def sync_suppliers(
         models.Store.organization_id == ctx.org_id
     ).first()
     
+    
     tenant_id = getattr(store, 'stellar_tenant', None) if store else None
+    print(f"DEBUG: Sync Suppliers. User Org: {ctx.org_id}, Found Store: {store.name if store else 'None'}, Tenant: {tenant_id}")
     
     if not tenant_id:
-         raise HTTPException(status_code=400, detail="Organization not linked to Stellar Tenant. Please configure store settings.")
+         raise HTTPException(status_code=400, detail=f"No Stellar Tenant for Org {ctx.org_id}. Store: {store.name if store else 'None'}")
+
 
     try:
         stats = await stellar_service.sync_stellar_suppliers(db, tenant_id)
