@@ -177,6 +177,7 @@ async def sync_suppliers(
 
 
     try:
+        # Pass a flag or just rely on the new parsing logic
         stats = await stellar_service.sync_stellar_suppliers(db, tenant_id)
         return {"status": "success", "stats": stats}
     except stellar_service.StellarError as e:
