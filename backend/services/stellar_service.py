@@ -609,12 +609,16 @@ async def sync_stellar_suppliers(
             if isinstance(response, list):
                 items = response
             elif isinstance(response, dict):
-                if "items" in response:
-                    items = response["items"]
-                elif "data" in response:
-                    items = response["data"]
-                elif "result" in response:
-                    items = response["result"]
+                # Try all known keys
+                for key in ["items", "data", "result", "suppliers", "rows"]:
+                    if key in response:
+                        val = response[key]
+                        if isinstance(val, list):
+                            items = val
+                            break
+                        if isinstance(val, dict) and "data" in val: # Nested data?
+                             items = val["data"]
+                             break
             
             # If no items found in this page, we are done
             if not items:
