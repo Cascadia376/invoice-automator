@@ -310,23 +310,25 @@ async def post_invoice_to_stellar(
         raise StellarError(f"Unexpected error: {str(e)}")
 
 
-def get_stellar_config_for_vendor(vendor_name: str, db: Session) -> Optional[Dict[str, str]]:
+def get_stellar_config_for_vendor(vendor_name: str, org_id: str, db: Session) -> Optional[Dict[str, str]]:
     """
     Get Stellar supplier configuration for a vendor.
     
     Args:
         vendor_name: Name of the vendor
+        org_id: Organization ID context
         db: Database session
         
     Returns:
         Dictionary with supplier_id and supplier_name, or None if not configured
     """
     vendor = db.query(models.Vendor).filter(
-        models.Vendor.name == vendor_name
+        models.Vendor.name == vendor_name,
+        models.Vendor.organization_id == org_id
     ).first()
     
     if not vendor:
-        logger.warning(f"Vendor not found: {vendor_name}")
+        logger.warning(f"Vendor not found: {vendor_name} (Org: {org_id})")
         return None
     
     # Check if vendor has Stellar configuration
@@ -382,7 +384,7 @@ async def post_invoice_if_configured(
         location_id = getattr(store, 'stellar_location_id', None)
     
     # Get vendor configuration
-    vendor_config = get_stellar_config_for_vendor(invoice.vendor_name, db)
+    vendor_config = get_stellar_config_for_vendor(invoice.vendor_name, invoice.organization_id, db)
     if not vendor_config:
         msg = f"Stellar not configured for vendor {invoice.vendor_name}"
         if require_config:
@@ -467,7 +469,7 @@ def check_invoice_preflight(db: Session, invoice_ids: List[str]) -> Dict:
                 })
                  is_blocked = True
             else:
-                vendor_config = get_stellar_config_for_vendor(inv.vendor_name, db)
+                vendor_config = get_stellar_config_for_vendor(inv.vendor_name, inv.organization_id, db)
                 if not vendor_config:
                     # Add to blocking vendors list
                     v_name = inv.vendor_name
@@ -475,6 +477,7 @@ def check_invoice_preflight(db: Session, invoice_ids: List[str]) -> Dict:
                         blocking_vendors_map[v_name] = []
                     blocking_vendors_map[v_name].append(inv.id)
                     is_blocked = True
+
             
         # Check 5: Store Configuration (Tenant/Location)
         # Verify if store has credentials or override
