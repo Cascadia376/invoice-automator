@@ -26,6 +26,11 @@ STELLAR_LOCATION_ID = os.getenv("STELLAR_LOCATION_ID")
 STELLAR_BASE_URL = os.getenv("STELLAR_BASE_URL", "https://stock-import.stellarpos.io")
 STELLAR_INVENTORY_URL = os.getenv("STELLAR_INVENTORY_URL", "https://inventorymanagement.stellarpos.io")
 
+# Logic to handle placeholder values in Render/Env
+if STELLAR_INVENTORY_URL == "DEFAULT":
+    STELLAR_INVENTORY_URL = "https://inventorymanagement.stellarpos.io"
+
+
 
 class StellarError(Exception):
     """Custom exception for Stellar API errors"""
