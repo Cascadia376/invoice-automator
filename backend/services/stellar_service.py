@@ -603,8 +603,22 @@ async def sync_stellar_suppliers(
                 page=page
             )
             
-            items = response if isinstance(response, list) else response.get("items", [])
+            
+            # Normalize response structure (Stellar API varies)
+            items = []
+            if isinstance(response, list):
+                items = response
+            elif isinstance(response, dict):
+                if "items" in response:
+                    items = response["items"]
+                elif "data" in response:
+                    items = response["data"]
+                elif "result" in response:
+                    items = response["result"]
+            
+            # If no items found in this page, we are done
             if not items:
+
                 break
                 
             for item in items:
