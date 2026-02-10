@@ -92,6 +92,29 @@ export function StellarPostModal({ invoiceIds, open, onClose, onSuccess }: Stell
         }
     };
 
+    const syncSuppliers = async () => {
+        setIsLoadingSuppliers(true);
+        try {
+            const token = await getToken();
+            toast.info("Syncing suppliers from Stellar...");
+            const res = await fetch(`${API_BASE}/api/stellar/sync-suppliers`, {
+                method: 'POST',
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+            });
+            if (res.ok) {
+                toast.success("Suppliers synced successfully");
+                fetchAllSuppliers(); // Refresh local list
+            } else {
+                throw new Error("Sync failed");
+            }
+        } catch (e) {
+            toast.error("Failed to sync suppliers");
+        } finally {
+            setIsLoadingSuppliers(false);
+        }
+    };
+
+
 
     const runPreflight = async () => {
         setStep('loading');
@@ -309,7 +332,19 @@ export function StellarPostModal({ invoiceIds, open, onClose, onSuccess }: Stell
 
                 <div className="space-y-4">
                     <div className="space-y-2">
-                        <Label>Search Stellar for "{currentVendor.vendorName}"</Label>
+                        <div className="flex justify-between items-center">
+                            <Label>Search Stellar for "{currentVendor.vendorName}"</Label>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={syncSuppliers}
+                                disabled={isLoadingSuppliers}
+                                className="h-6 text-xs text-blue-600 hover:text-blue-800"
+                            >
+                                {isLoadingSuppliers ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+                                Refresh Suppliers
+                            </Button>
+                        </div>
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                             <Input

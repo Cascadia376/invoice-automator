@@ -325,3 +325,16 @@ class Job(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
+
+class StellarSupplier(Base):
+    __tablename__ = "stellar_suppliers"
+
+    id = Column(String, primary_key=True, index=True) # Stellar UUID
+    tenant_id = Column(String, index=True, nullable=False)
+    name = Column(String, index=True)
+    code = Column(String, nullable=True) # Supplier Code if available
+    
+    data = Column(String, nullable=True) # Full JSON dump for future use
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

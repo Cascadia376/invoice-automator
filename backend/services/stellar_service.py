@@ -569,30 +569,113 @@ async def search_stellar_suppliers(
         raise StellarError(f"Search failed: {str(e)}")
 
 
+async def sync_stellar_suppliers(
+    db: Session,
+    tenant_id: str
+) -> Dict[str, int]:
+    """
+    Fetch ALL suppliers from Stellar and upsert into local DB.
+    Returns stats: { "added": 0, "updated": 0, "total": 0 }
+    """
+    if not STELLAR_API_TOKEN:
+        raise StellarError("STELLAR_API_TOKEN not configured")
+        
+    page = 1
+    limit = 250 # Maximize page size
+    total_processed = 0
+    added = 0
+    updated = 0
+    
+    logger.info(f"SYNC: Starting supplier sync for tenant {tenant_id}")
+    
+    while True:
+        try:
+            logger.info(f"SYNC: Fetching page {page}...")
+            response = await search_stellar_suppliers(
+                query="", 
+                tenant_id=tenant_id, 
+                limit=limit,
+                page=page
+            )
+            
+            items = response if isinstance(response, list) else response.get("items", [])
+            if not items:
+                break
+                
+            for item in items:
+                supplier_id = item.get("id") or item.get("uuid")
+                if not supplier_id:
+                    continue
+                    
+                # Check existence
+                existing = db.query(models.StellarSupplier).filter(
+                    models.StellarSupplier.id == supplier_id
+                ).first()
+                
+                # Extract fields
+                name = item.get("name")
+                code = item.get("code")
+                data_json = json.dumps(item)
+                
+                if existing:
+                    # Update if changed
+                    if existing.name != name or existing.code != code:
+                        existing.name = name
+                        existing.code = code
+                        existing.data = data_json
+                        updated += 1
+                else:
+                    new_supplier = models.StellarSupplier(
+                        id=supplier_id,
+                        tenant_id=tenant_id,
+                        name=name,
+                        code=code,
+                        data=data_json
+                    )
+                    db.add(new_supplier)
+                    added += 1
+                
+            total_processed += len(items)
+            db.commit() # Commit each page to be safe/incremental
+            
+            # Pagination check
+            # If we got fewer items than limit, we are done
+            if len(items) < limit:
+                break
+                
+            page += 1
+            
+        except Exception as e:
+            logger.error(f"SYNC ERROR on page {page}: {e}")
+            break
+            
+    return {"added": added, "updated": updated, "total": total_processed}
+    
+    
 async def list_stellar_suppliers(
-    tenant_id: Optional[str] = None,
-    limit: int = 1000
+    db: Session,
+    tenant_id: Optional[str] = None
 ) -> List[Dict]:
     """ 
-    Fetch a large list of suppliers to preload the UI.
+    Fetch suppliers from LOCAL DB for UI.
+    Falls back to empty list if no tenant.
     """
-    # Reuse search logic with empty query and high limit
-    try:
-        response = await search_stellar_suppliers(
-            query="", 
-            tenant_id=tenant_id, 
-            limit=limit,
-            page=1
-        )
-        
-        # Extract items from response (it might be wrapped)
-        # API usually returns { items: [...], meta: ... } or just [...]
-        items = response if isinstance(response, list) else response.get("items", [])
-        return items
-        
-    except Exception as e:
-        logger.error(f"Failed to list suppliers: {e}")
+    if not tenant_id:
         return []
+        
+    suppliers = db.query(models.StellarSupplier).filter(
+        models.StellarSupplier.tenant_id == tenant_id
+    ).order_by(models.StellarSupplier.name).all()
+    
+    return [
+        {
+            "id": s.id,
+            "name": s.name,
+            "code": s.code,
+            "tenant_id": s.tenant_id
+        }
+        for s in suppliers
+    ]
 
 
 

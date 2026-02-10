@@ -141,7 +141,33 @@ async def list_all_suppliers(
     
     # We could implement redis/memory caching here if needed
     
-    items = await stellar_service.list_stellar_suppliers(tenant_id=tenant_id)
+    # NEW: Fetch from local DB
+    items = await stellar_service.list_stellar_suppliers(db, tenant_id=tenant_id)
+    return items
+
+@router.post("/sync-suppliers")
+async def sync_suppliers(
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.require_role("admin")) 
+):
+    """
+    Trigger a full sync of Stellar suppliers to local DB.
+    """
+    # Fetch store config to get the correct tenant
+    store = db.query(models.Store).filter(
+        models.Store.organization_id == ctx.org_id
+    ).first()
+    
+    tenant_id = getattr(store, 'stellar_tenant', None) if store else None
+    
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="Organization not linked to Stellar Tenant")
+
+    try:
+        stats = await stellar_service.sync_stellar_suppliers(db, tenant_id)
+        return {"status": "success", "stats": stats}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
     return items
 
 

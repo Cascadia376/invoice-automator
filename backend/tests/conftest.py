@@ -4,6 +4,9 @@ import pytest
 
 # Set Auth Bypass BEFORE importing app/auth
 os.environ["DISABLE_AUTH"] = "true"
+# Set Dummy DB for testing BEFORE importing app
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+os.environ["DB_POOL_DISABLE"] = "true"
 
 # Ensure backend modules can be imported
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
