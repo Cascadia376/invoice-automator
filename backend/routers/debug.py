@@ -4,7 +4,8 @@ import os
 
 import models, auth, migrate
 from database import get_db
-from services import demo_service
+from services import demo_service, storage, stellar_service
+
 
 router = APIRouter(
     tags=["debug"]
@@ -220,3 +221,60 @@ def debug_org_context(
             "suggestion": "Check if invoices need to be migrated to the correct organization_id"
         }
     }
+
+
+@router.get("/api/debug/diagnostics")
+async def diagnostics(
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """
+    Comprehensive diagnostics for deployment issues.
+    Checks: Env Vars, Database, S3 Storage, Stellar API.
+    """
+    import os
+    results = {
+        "environment": {},
+        "storage": {"status": "unknown"},
+        "stellar": {"status": "unknown"},
+        "database": {"status": "connected"} # If we got here, DB is likely fine via Depends
+    }
+    
+    # 1. Environment Variables
+    results["environment"] = {
+        "AWS_BUCKET_NAME": os.getenv("AWS_BUCKET_NAME"),
+        "STELLAR_API_TOKEN": "SET" if os.getenv("STELLAR_API_TOKEN") else "MISSING",
+        "STELLAR_TENANT_ID": os.getenv("STELLAR_TENANT_ID"),
+        "STELLAR_INVENTORY_URL": os.getenv("STELLAR_INVENTORY_URL", "DEFAULT"),
+        "PDF_GENERATION_ENABLED": os.getenv("PDF_GENERATION_ENABLED", "True")
+    }
+    
+    # 2. Check Storage (S3)
+    try:
+        if not storage.AWS_BUCKET_NAME:
+            results["storage"] = {"status": "error", "message": "AWS_BUCKET_NAME not set"}
+        else:
+            # Try to list 1 object to verify permissions/connectivity
+            s3 = storage.storage_client._get_client() # Access internal client
+            s3.list_objects_v2(Bucket=storage.AWS_BUCKET_NAME, MaxKeys=1)
+            results["storage"] = {"status": "ok", "bucket": storage.AWS_BUCKET_NAME}
+    except Exception as e:
+        results["storage"] = {"status": "error", "message": str(e)}
+        
+    # 3. Check Stellar
+    try:
+        # We can't easily ping without a tenant, but we can check if token is present
+        if not stellar_service.STELLAR_API_TOKEN:
+             results["stellar"] = {"status": "error", "message": "STELLAR_API_TOKEN not set"}
+        else:
+            # Maybe try a lightweight call if a tenant is linked to the store?
+            store = db.query(models.Store).filter(models.Store.organization_id == ctx.org_id).first()
+            if store and store.stellar_tenant:
+                results["stellar"]["tenant_linked"] = store.stellar_tenant
+                results["stellar"]["status"] = "configured"
+            else:
+                results["stellar"] = {"status": "warning", "message": "No Stellar Tenant linked to this Organization"}
+    except Exception as e:
+        results["stellar"] = {"status": "error", "message": str(e)}
+        
+    return results

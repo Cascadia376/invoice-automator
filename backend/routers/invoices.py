@@ -279,8 +279,12 @@ def get_invoice_file(
             }
         )
     except Exception as e:
-        print(f"PROXY ERROR: {e}")
-        raise HTTPException(status_code=404, detail="File not found in storage")
+        logger.error(f"PROXY ERROR: {e}")
+        # Distinguish between not found and other errors if possible, 
+        # but safely returning the error string helps debugging.
+        if "NoSuchKey" in str(e) or "404" in str(e):
+             raise HTTPException(status_code=404, detail=f"File not found in S3: {s3_key}")
+        raise HTTPException(status_code=500, detail=f"Storage Error: {str(e)}")
 
 from sqlalchemy.orm import joinedload
 
