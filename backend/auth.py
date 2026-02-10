@@ -20,6 +20,7 @@ class UserContext(BaseModel):
     user_id: str
     org_id: str
     email: Optional[str] = None
+    role: Optional[str] = None
 
 security = HTTPBearer(auto_error=False)
 
@@ -220,7 +221,8 @@ class RoleChecker:
             if AUTH_MODE == "log-only":
                 logger.info(f"AUTH ROLE (Log-only): Bypassing role check for {self.allowed_roles}")
             # Mock context for bypass
-            return {"user_id": "bypass", "role": list(self.allowed_roles)[0], "internal_user_id": "bypass"}
+            bypass_role = list(self.allowed_roles)[0] if self.allowed_roles else "admin"
+            return UserContext(user_id="bypass", org_id="bypass-org", email="bypass@example.com", role=bypass_role)
         
         if not ctx:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
@@ -229,12 +231,8 @@ class RoleChecker:
         
         # SUPER ADMIN BYPASS
         if ctx.email == "jay@trufflesgroup.com" or ctx.email == "dev@example.com":
-             return {
-                "user_id": ctx.user_id,
-                "role": "admin",
-                "internal_user_id": ctx.user_id,
-                "org_id": ctx.org_id 
-            }
+             ctx.role = "admin"
+             return ctx
 
         # Check if user has ANY of the allowed roles
         # We also check for 'admin' as a super-role that can access anything
@@ -252,9 +250,6 @@ class RoleChecker:
                 detail=f"Operation requires one of roles: {self.allowed_roles}"
             )
             
-        return {
-            "user_id": ctx.user_id,
-            "role": user_role.role_id,
-            "internal_user_id": ctx.user_id, # Mapping sub to internal_id as no User table exists
-            "org_id": ctx.org_id 
-        }
+        # Return the UserContext object to match the type hint
+        return ctx
+
