@@ -147,17 +147,20 @@ def update_organization(
     ctx: auth.UserContext = Depends(auth.get_current_user)
 ):
     """Update organization (Store) details"""
+    db_store = None
     try:
         store_id_int = int(org_id)
+        db_store = db.query(models.Store).filter(models.Store.store_id == store_id_int).first()
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid organization ID format")
+        # If not an integer, try looking up by organization_id (string)
+        print(f"DEBUG: org_id '{org_id}' is not an int. Searching by organization_id.")
+        db_store = db.query(models.Store).filter(models.Store.organization_id == org_id).first()
 
-    db_store = db.query(models.Store).filter(models.Store.store_id == store_id_int).first()
     if not db_store:
-        print(f"DEBUG: Organization update failed. Store ID {store_id_int} not found.")
+        print(f"DEBUG: Organization update failed. ID {org_id} not found.")
         raise HTTPException(status_code=404, detail="Organization not found")
 
-    print(f"DEBUG: Updating store {store_id_int} ({db_store.name}). OLD Tenant: {db_store.stellar_tenant}, NEW Payload: {store_update}")
+    print(f"DEBUG: Updating store {db_store.store_id} ({db_store.name}). OLD Tenant: {db_store.stellar_tenant}, NEW Payload: {store_update}")
 
 
     if store_update.name is not None:
