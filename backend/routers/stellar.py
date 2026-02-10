@@ -171,12 +171,16 @@ async def sync_suppliers(
     tenant_id = getattr(store, 'stellar_tenant', None) if store else None
     
     if not tenant_id:
-        raise HTTPException(status_code=400, detail="Organization not linked to Stellar Tenant")
+         raise HTTPException(status_code=400, detail="Organization not linked to Stellar Tenant. Please configure store settings.")
 
     try:
         stats = await stellar_service.sync_stellar_suppliers(db, tenant_id)
         return {"status": "success", "stats": stats}
+    except stellar_service.StellarError as e:
+        # Catch specific Stellar errors (like missing token)
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.error(f"SYNC ERROR: {e}")
         raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
     return items
 
