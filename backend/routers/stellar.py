@@ -111,6 +111,16 @@ async def proxy_search_suppliers(
     ).first()
     
     tenant_id = getattr(store, 'stellar_tenant', None) if store else None
+
+    if not tenant_id:
+        # If no tenant is linked, we cannot search Stellar.
+        # Return empty list instead of crashing or erroring, 
+        # so the UI just shows "No results".
+        return []
+
+    if not stellar_service.STELLAR_API_TOKEN:
+        # If API token is missing, we also can't search.
+        return []
     
     try:
         results = await stellar_service.search_stellar_suppliers(

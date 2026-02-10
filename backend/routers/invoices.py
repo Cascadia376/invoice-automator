@@ -264,6 +264,11 @@ def get_invoice_file(
 
     try:
         import boto3
+        
+        if not storage.AWS_BUCKET_NAME:
+            logger.error("AWS_BUCKET_NAME not set in environment.")
+            raise HTTPException(status_code=500, detail="Server storage parsing error (Missing Bucket Config)")
+            
         s3 = storage.get_s3_client()
         response = s3.get_object(Bucket=storage.AWS_BUCKET_NAME, Key=s3_key)
         return StreamingResponse(
