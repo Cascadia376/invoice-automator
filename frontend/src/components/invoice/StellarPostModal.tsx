@@ -44,21 +44,54 @@ export function StellarPostModal({ invoiceIds, open, onClose, onSuccess }: Stell
     const [isSearching, setIsSearching] = useState(false);
     const [currentVendorIndex, setCurrentVendorIndex] = useState(0);
 
+    // Cached Suppliers for Preloading
+    const [allSuppliers, setAllSuppliers] = useState<any[]>([]);
+    const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false);
+
+
     // Posting State
     const [isPosting, setIsPosting] = useState(false);
 
     useEffect(() => {
-        if (open && invoiceIds.length > 0) {
-            runPreflight();
-        } else {
-            // Reset state on close
+        if (open) {
             setStep('loading');
             setPreflight(null);
             setResult(null);
             setMappedVendors({});
             setCurrentVendorIndex(0);
+            setSearchQuery('');
+            setSearchResults([]);
+
+            // 1. Fetch all suppliers (if not already cached or if we want fresh)
+            // We'll fetch every time modal opens to be safe, or check length
+            if (allSuppliers.length === 0) {
+                fetchAllSuppliers();
+            }
+
+            // 2. Run Preflight
+            runPreflight();
         }
     }, [open, invoiceIds]);
+
+    const fetchAllSuppliers = async () => {
+        setIsLoadingSuppliers(true);
+        try {
+            const token = await getToken();
+            const res = await fetch(`${API_BASE}/api/stellar/suppliers`, {
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                const items = Array.isArray(data) ? data : (data.items || []);
+                setAllSuppliers(items);
+            }
+        } catch (e) {
+            console.error("Failed to preload suppliers", e);
+        } finally {
+            setIsLoadingSuppliers(false);
+        }
+    };
+
 
     const runPreflight = async () => {
         setStep('loading');
@@ -87,10 +120,36 @@ export function StellarPostModal({ invoiceIds, open, onClose, onSuccess }: Stell
         }
     };
 
-    const handleSearch = async (query: string) => {
+    const handleSearch = (query: string) => {
         setSearchQuery(query);
+
+        // If we have preloaded suppliers, filter them locally
+        if (allSuppliers.length > 0) {
+            if (!query) {
+                setSearchResults(allSuppliers.slice(0, 50)); // Show top 50 by default
+                return;
+            }
+
+            const lowerQ = query.toLowerCase();
+            const filtered = allSuppliers.filter((s: any) =>
+                s.name.toLowerCase().includes(lowerQ) ||
+                (s.code && s.code.toLowerCase().includes(lowerQ))
+            ).slice(0, 50); // Limit results
+
+            setSearchResults(filtered);
+            return;
+        }
+
+        // Fallback to API search (Original Logic)
         if (query.length < 2) return;
 
+        setIsSearching(true);
+        // ... (existing api call logic could remain as fallback, but for now we focus on preload)
+        // Actually, let's keep the API call as valid fallback if allSuppliers is empty
+        apiSearch(query);
+    };
+
+    const apiSearch = async (query: string) => {
         setIsSearching(true);
         try {
             const token = await getToken();
@@ -107,7 +166,8 @@ export function StellarPostModal({ invoiceIds, open, onClose, onSuccess }: Stell
         } finally {
             setIsSearching(false);
         }
-    };
+    }
+
 
     const handleSaveMapping = async (stellarId: string, stellarName: string) => {
         if (!preflight) return;

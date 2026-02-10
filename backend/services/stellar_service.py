@@ -569,6 +569,33 @@ async def search_stellar_suppliers(
         raise StellarError(f"Search failed: {str(e)}")
 
 
+async def list_stellar_suppliers(
+    tenant_id: Optional[str] = None,
+    limit: int = 1000
+) -> List[Dict]:
+    """ 
+    Fetch a large list of suppliers to preload the UI.
+    """
+    # Reuse search logic with empty query and high limit
+    try:
+        response = await search_stellar_suppliers(
+            query="", 
+            tenant_id=tenant_id, 
+            limit=limit,
+            page=1
+        )
+        
+        # Extract items from response (it might be wrapped)
+        # API usually returns { items: [...], meta: ... } or just [...]
+        items = response if isinstance(response, list) else response.get("items", [])
+        return items
+        
+    except Exception as e:
+        logger.error(f"Failed to list suppliers: {e}")
+        return []
+
+
+
 async def retrieve_stellar_invoice(
     asn_number: str,
     tenant_id: str

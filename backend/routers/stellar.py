@@ -123,6 +123,28 @@ async def proxy_search_suppliers(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
+@router.get("/suppliers")
+async def list_all_suppliers(
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """
+    List all Stellar suppliers (or top 1000) for preloading in UI.
+    Cached for performance (not really, but frontend should cache).
+    """
+    # Fetch store config to get the correct tenant
+    store = db.query(models.Store).filter(
+        models.Store.organization_id == ctx.org_id
+    ).first()
+    
+    tenant_id = getattr(store, 'stellar_tenant', None)
+    
+    # We could implement redis/memory caching here if needed
+    
+    items = await stellar_service.list_stellar_suppliers(tenant_id=tenant_id)
+    return items
+
+
 @router.get("/sync/{invoice_id}")
 async def sync_invoice_from_stellar(
     invoice_id: str,
