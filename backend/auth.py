@@ -218,10 +218,19 @@ class RoleChecker:
     def __call__(self, ctx: Optional[UserContext] = Depends(get_current_user), db = Depends(get_db)):
         # Bypass role checks in log-only or disabled modes to prevent disruption during rollout
         if DISABLE_AUTH or AUTH_MODE == "log-only" or (not AUTH_REQUIRED and not ctx):
-            if AUTH_MODE == "log-only":
-                logger.info(f"AUTH ROLE (Log-only): Bypassing role check for {self.allowed_roles}")
             # Mock context for bypass
-            bypass_role = list(self.allowed_roles)[0] if self.allowed_roles else "admin"
+            bypass_role = "admin"
+            if self.allowed_roles:
+                 # allowed_roles might be a set or string depending on initialization (handled in __init__ but safe to check)
+                 if isinstance(self.allowed_roles, set):
+                     bypass_role = list(self.allowed_roles)[0]
+                 else:
+                     bypass_role = str(self.allowed_roles)
+
+            if ctx:
+                ctx.role = bypass_role
+                return ctx
+            
             return UserContext(user_id="bypass", org_id="bypass-org", email="bypass@example.com", role=bypass_role)
         
         if not ctx:
