@@ -322,8 +322,11 @@ def get_stellar_config_for_vendor(vendor_name: str, org_id: str, db: Session) ->
     Returns:
         Dictionary with supplier_id and supplier_name, or None if not configured
     """
+    from services import vendor_service
+    normalized_name = vendor_service.normalize_vendor_name(vendor_name)
+    
     vendor = db.query(models.Vendor).filter(
-        models.Vendor.name == vendor_name,
+        models.Vendor.name == normalized_name,
         models.Vendor.organization_id == org_id
     ).first()
     
