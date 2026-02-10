@@ -470,6 +470,8 @@ def check_invoice_preflight(db: Session, invoice_ids: List[str]) -> Dict:
                  is_blocked = True
             else:
                 vendor_config = get_stellar_config_for_vendor(inv.vendor_name, inv.organization_id, db)
+                print(f"DEBUG PREFLIGHT: Vendor='{inv.vendor_name}' Org='{inv.organization_id}' Config={vendor_config}")
+                
                 if not vendor_config:
                     # Add to blocking vendors list
                     v_name = inv.vendor_name
