@@ -110,7 +110,7 @@ async def proxy_search_suppliers(
         models.Store.organization_id == ctx.org_id
     ).first()
     
-    tenant_id = getattr(store, 'stellar_tenant', None)
+    tenant_id = getattr(store, 'stellar_tenant', None) if store else None
     
     try:
         results = await stellar_service.search_stellar_suppliers(
@@ -137,7 +137,7 @@ async def list_all_suppliers(
         models.Store.organization_id == ctx.org_id
     ).first()
     
-    tenant_id = getattr(store, 'stellar_tenant', None)
+    tenant_id = getattr(store, 'stellar_tenant', None) if store else None
     
     # We could implement redis/memory caching here if needed
     

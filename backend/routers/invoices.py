@@ -257,14 +257,14 @@ def get_invoice_file(
         raise HTTPException(status_code=404, detail="File not found")
         
     s3_key = invoice.file_url
-    if s3_key.startswith("/api/"): # Re-entrant check
-        # We need the original key. If we only stored the proxy path in DB (which we shouldn't)
-        # we'd be stuck. But we store s3_key in DB and only overwrite in response.
-        pass
+    # Validate key does not look like a proxy URL (DB corruption check)
+    if s3_key.startswith("/api/"):
+        logger.error(f"Invalid S3 Key in DB for invoice {invoice_id}: {s3_key}")
+        raise HTTPException(status_code=500, detail="Invalid file reference in database")
 
-    import boto3
-    s3 = storage.get_s3_client()
     try:
+        import boto3
+        s3 = storage.get_s3_client()
         response = s3.get_object(Bucket=storage.AWS_BUCKET_NAME, Key=s3_key)
         return StreamingResponse(
             response['Body'], 
