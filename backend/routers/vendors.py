@@ -193,15 +193,22 @@ async def link_stellar_by_name(
     If the vendor doesn't exist, it creates it.
     Also updates the Global Registry.
     """
-    body = await request.json()
-    print(f"DEBUG LINK STELLAR PAYLOAD: {body}")
+    try:
+        body = await request.json()
+    except Exception as e:
+        print(f"DEBUG LINK STELLAR JSON PARSE ERROR: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid JSON: {str(e)}")
+        
+    print(f"DEBUG LINK STELLAR PAYLOAD: {body} (Type: {type(body)})")
     
     vendor_name = body.get("vendorName") or body.get("vendor_name")
     stellar_supplier_id = body.get("stellarSupplierId") or body.get("stellar_supplier_id")
     stellar_supplier_name = body.get("stellarSupplierName") or body.get("stellar_supplier_name")
     
     if not vendor_name or not stellar_supplier_id:
-        raise HTTPException(status_code=422, detail="Missing required fields (vendorName, stellarSupplierId)")
+        received = list(body.keys()) if isinstance(body, dict) else str(body)
+        print(f"DEBUG LINK STELLAR MISSING FIELDS. Received keys: {received}")
+        raise HTTPException(status_code=422, detail=f"Missing required fields (vendorName, stellarSupplierId). Received: {received}")
 
     # 1. Find or Create Vendor
     vendor = vendor_service.find_vendor_by_name(db, vendor_name, ctx.org_id)
