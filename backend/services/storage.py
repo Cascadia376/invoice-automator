@@ -96,3 +96,10 @@ def download_file(object_name: str, file_path: str):
     except ClientError as e:
         logger.error(f"Failed to download file from S3: {e}")
         return False
+
+def get_s3_client():
+    """
+    Expose the raw boto3 client for advanced operations (like streaming).
+    """
+    return storage_client._get_client()
+
