@@ -419,7 +419,7 @@ export function StellarPostModal({ invoiceIds, open, onClose, onSuccess }: Stell
                                             <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
                                         }
                                         <div>
-                                            <span className="font-medium text-gray-900">Invoice {issue.invoiceId.substring(0, 8)}...: </span>
+                                            <span className="font-medium text-gray-900">Invoice {((issue.invoiceId || (issue as any).invoice_id) || "").substring(0, 8)}...: </span>
                                             <span className="text-gray-600">{issue.message}</span>
                                         </div>
                                     </div>
