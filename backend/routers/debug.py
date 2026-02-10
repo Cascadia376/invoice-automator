@@ -276,5 +276,24 @@ async def diagnostics(
                 results["stellar"] = {"status": "warning", "message": "No Stellar Tenant linked to this Organization"}
     except Exception as e:
         results["stellar"] = {"status": "error", "message": str(e)}
+
+    # 4. Check Tables
+    from sqlalchemy import inspect
+    inspector = inspect(db.get_bind())
+    tables = inspector.get_table_names()
+    results["database"]["tables"] = tables
+    results["database"]["has_stellar_suppliers"] = "stellar_suppliers" in tables
         
     return results
+
+@router.post("/api/debug/fix-db")
+def fix_database_schema(db: Session = Depends(get_db), ctx: auth.UserContext = Depends(auth.require_role("admin"))):
+    """
+    Force create missing tables.
+    """
+    try:
+        models.Base.metadata.create_all(bind=db.get_bind())
+        return {"status": "success", "message": "Database schema updated (create_all ran)"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
