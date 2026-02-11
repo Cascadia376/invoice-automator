@@ -63,6 +63,27 @@ async def upload_invoice(
         else:
             files_to_process = [original_temp_path]
 
+        # 2. Process each file through ingestion
+        print(f"STAGE 2: Processing {len(files_to_process)} file(s)...")
+        created_invoices = []
+        for file_path in files_to_process:
+            try:
+                invoice = ingestion_service.process_invoice(
+                    db=db,
+                    file_path=file_path,
+                    org_id=ctx.org_id,
+                    user_id=ctx.user_id,
+                    original_filename=file.filename
+                )
+                created_invoices.append(invoice)
+            except Exception as proc_error:
+                print(f"ERROR processing file {file_path}: {proc_error}")
+                import traceback
+                traceback.print_exc()
+                # Continue processing remaining files
+
+        if not created_invoices:
+            raise HTTPException(status_code=500, detail="Failed to process any invoices from the uploaded file")
 
         return created_invoices
     except Exception as e:
