@@ -67,7 +67,7 @@ def generate_stellar_csv(line_items: List[models.LineItem]) -> BytesIO:
         writer.writerow([
             item.sku or '',
             item.quantity or 0,
-            item.total_price or 0
+            item.amount or 0
         ])
     
     # Convert to bytes
