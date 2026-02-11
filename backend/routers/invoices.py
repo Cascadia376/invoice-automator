@@ -54,12 +54,9 @@ async def upload_invoice(
             print(f"DEBUG: Checking for multi-invoice content in {file.filename}")
             boundaries = splitting_service.detect_invoice_boundaries(original_temp_path)
             
-            if len(boundaries) > 1:
-                print(f"DEBUG: Multiple invoices detected ({len(boundaries)}). Splitting...")
-                split_paths = splitting_service.split_pdf_into_files(original_temp_path, boundaries)
-                files_to_process = split_paths
-            else:
-                files_to_process = [original_temp_path]
+            # Use splitting service to isolate invoices (removes cover pages even if only 1 invoice found)
+            split_paths = splitting_service.split_pdf_into_files(original_temp_path, boundaries)
+            files_to_process = split_paths
         else:
             files_to_process = [original_temp_path]
 

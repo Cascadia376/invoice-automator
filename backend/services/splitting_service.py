@@ -6,66 +6,104 @@ import shutil
 from openai import OpenAI
 from typing import List, Dict, Any
 import tempfile
+import base64
 
 def detect_invoice_boundaries(file_path: str) -> List[Dict[str, Any]]:
     """
     Analyzes a PDF to determine if it contains multiple invoices.
-    Returns a list of page ranges for each detected invoice.
-    Example: [{"invoice_number": "123", "pages": [0, 1]}, {"invoice_number": "456", "pages": [2, 2]}]
+    Supports both text-based and image-based (scanned) PDFs.
     """
     try:
         doc = fitz.open(file_path)
         num_pages = len(doc)
         
-        # If only 1 page, no need for complex detection
         if num_pages <= 1:
             doc.close()
-            return [{"invoice_number": "SINGLE", "pages": [0, 0]}]
+            return [{"invoice_number": "SINGLE", "pages": [0, 0], "is_invoice": True}]
 
+        # 1. Detect if it's a scan (low text density)
+        full_text = ""
         page_previews = []
         for i in range(num_pages):
             page = doc.load_page(i)
-            # Extract text from the top and bottom of the page where headers/footers usually are
             text = page.get_text()
-            # Take a snippet of the first 1000 and last 500 chars
-            snippet = f"--- PAGE {i} ---\n{text[:1000]}\n[...]\n{text[-500:]}"
-            page_previews.append(snippet)
+            full_text += text
+            page_previews.append(f"--- PAGE {i} ---\n{text[:800]}")
         
-        doc.close()
+        is_scanned = len(full_text.strip()) < (50 * num_pages)
+        print(f"SPLITTER: Scan detection - is_scanned={is_scanned}, text_len={len(full_text)}")
 
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             print("WARNING: No OpenAI API key for splitting. Treating as single file.")
-            return [{"invoice_number": "UNKNOWN", "pages": [0, num_pages - 1]}]
+            doc.close()
+            return [{"invoice_number": "UNKNOWN", "pages": [0, num_pages - 1], "is_invoice": True}]
 
         client = OpenAI(api_key=api_key)
         
         system_prompt = """
-        You are a document processing assistant. You will be given text snippets from pages of a PDF that may contain multiple merged invoices.
-        Your goal is to identify how many individual invoices are in the document and which pages belong to each.
+        You are a document processing assistant. You will be given content from pages of a PDF that may contain:
+        1. Merged invoices (multiple invoices in one file).
+        2. Non-invoice pages (Cover pages, fax headers, bank confirmations).
         
-        Logic:
-        1. A new invoice usually starts with a vendor name, address, and a new 'Invoice Number' or 'Order Number'.
-        2. Continuation pages usually lack the header or show 'Page 2 of X'.
-        3. If you see a radical change in vendor or invoice number, it's a new invoice.
+        Your goal is to identify the page ranges for each INDIVIDUAL invoice.
         
-        Return a JSON object with a 'ranges' key containing a list of objects:
+        CRITICAL RULES:
+        1. Identify "Cover Pages" or any page that is NOT part of an invoice. 
+        2. For the 'is_invoice' flag: set to true ONLY if the range contains a valid invoice.
+        3. A new invoice start is indicated by a new Vendor Name, Date, and Invoice Number.
+        4. If a page just looks like a continuation of the previous invoice (no new header), keep it in the same range.
+        
+        Return a JSON object:
         {
           "ranges": [
-            { "invoice_number": "extracted_id", "pages": [start_index, end_index] }
+            { 
+              "invoice_number": "extracted_id or description", 
+              "pages": [start_index, end_index],
+              "is_invoice": true/false 
+            }
           ]
         }
         Page indices are 0-based.
         """
-        
-        user_prompt = f"Identify invoice boundaries in this {num_pages}-page document:\n\n" + "\n".join(page_previews)
+
+        if is_scanned:
+            # 2. Vision-based splitting for scans
+            print(f"SPLITTER: Using Vision for {num_pages} scanned pages...")
+            content = [{"type": "text", "text": f"Identify invoice boundaries in this {num_pages}-page scanned document. Some pages might be cover letters."}]
+            
+            # Convert all pages to thumbnails for Vision
+            for i in range(num_pages):
+                page = doc.load_page(i)
+                # Keep resolution low (72 dpi) for splitting to save tokens/speed
+                pix = page.get_pixmap(matrix=fitz.Matrix(0.8, 0.8)) 
+                img_data = pix.tobytes("png")
+                base64_image = base64.b64encode(img_data).decode('utf-8')
+                
+                content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{base64_image}",
+                        "detail": "low"
+                    }
+                })
+            
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": content}
+            ]
+        else:
+            # 2. Text-based splitting
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Identify invoice boundaries in this {num_pages}-page document:\n\n" + "\n".join(page_previews)}
+            ]
+
+        doc.close()
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
+            messages=messages,
             response_format={"type": "json_object"},
             temperature=0
         )
@@ -73,16 +111,21 @@ def detect_invoice_boundaries(file_path: str) -> List[Dict[str, Any]]:
         result = json.loads(response.choices[0].message.content)
         ranges = result.get("ranges", [])
         
-        # Validation: check if ranges cover all pages and don't overlap
-        if not ranges:
-            return [{"invoice_number": "UNKNOWN", "pages": [0, num_pages - 1]}]
+        # Filter out non-invoice pages (like cover pages)
+        invoices_only = [r for r in ranges if r.get("is_invoice", True)]
+        
+        if not invoices_only:
+            print("WARNING: Splitting logic returned no valid invoices. Defaulting to full range.")
+            return [{"invoice_number": "UNKNOWN", "pages": [0, num_pages - 1], "is_invoice": True}]
             
-        print(f"SPLITTER: Detected {len(ranges)} invoices in {num_pages} pages.")
-        return ranges
+        print(f"SPLITTER: Detected {len(invoices_only)} invoices (skipped {len(ranges) - len(invoices_only)} non-invoice pages).")
+        return invoices_only
 
     except Exception as e:
         print(f"ERROR in boundary detection: {e}")
-        return [{"invoice_number": "ERROR", "pages": [0, 0]}] # Fallback to single page or original
+        import traceback
+        traceback.print_exc()
+        return [{"invoice_number": "ERROR", "pages": [0, num_pages - 1 if 'num_pages' in locals() else 0], "is_invoice": True}]
 
 def split_pdf_into_files(original_file_path: str, ranges: List[Dict[str, Any]]) -> List[str]:
     """
