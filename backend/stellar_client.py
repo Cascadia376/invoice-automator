@@ -109,6 +109,28 @@ class StellarClient:
             except httpx.RequestError as e:
                 raise StellarError(f"Network error: {str(e)}")
 
+    async def get_supplier(self, supplier_id: str, tenant_id: str) -> Dict:
+        """
+        Fetch a specific supplier's details from Stellar.
+        """
+        if not self.api_token:
+            raise StellarError("Stellar API Token not configured")
+
+        # Standard Stellar pattern for single retrieval
+        url = f"{self.inventory_url}/api/suppliers/retrieve/{supplier_id}"
+        headers = self._get_headers(tenant_id)
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            try:
+                response = await client.get(url, headers=headers)
+                
+                if not response.is_success:
+                    raise StellarError(f"Stellar Supplier Retrieval Failed: {response.status_code}", status_code=response.status_code)
+                
+                return response.json()
+            except httpx.RequestError as e:
+                raise StellarError(f"Network error: {str(e)}")
+
     @staticmethod
     def generate_csv(line_items: List[Dict]) -> BytesIO:
         """

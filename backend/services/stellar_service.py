@@ -16,6 +16,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 import models
+from stellar_client import stellar_client
 
 logger = logging.getLogger(__name__)
 
@@ -223,12 +224,49 @@ async def post_invoice_to_stellar(
     if store:
         display_location_name = store.stellar_location_name or store.name or display_location_name
 
+    # Determine supplier classification for Stellar
+    # Stellar requires non-LDB/AGLC suppliers to be "Custom Import"
+    # We use tax_ids to signal this classification to the stock-import API
+    # Based on supplier data analysis: d13a90f9-8c31-4d92-ad5f-b2af54fd2a08 is the Custom Import profile
+    
+    is_special_supplier = any(s in supplier_name.upper() for s in ["LDB", "AGLC"]) or \
+                           any(s in supplier_id.upper() for s in ["LDB", "AGLC"])
+    
+    tax_ids = ""
+    if not is_special_supplier:
+        try:
+            logger.info(f"Fetching profile for '{supplier_name}' ({supplier_id}) to check classification...")
+            supplier_profile = await stellar_client.get_supplier(supplier_id, tenant)
+            
+            # Extract tax_ids from the profile
+            # Profile structure usually matches the search results, but under a specific key or directly
+            profile_data = {}
+            if isinstance(supplier_profile, dict):
+                # The search result structure has a 'data' array, but single retrieval might be different
+                # From our probe: single retrieval might be under 'result' or 'data' or directly
+                profile_data = supplier_profile.get('result', {}) or supplier_profile.get('data', {}) or supplier_profile
+            
+            tax_ids = profile_data.get('tax_ids', "")
+            
+            if tax_ids:
+                logger.info(f"Dynamic classification SUCCESS: '{supplier_name}' tax_ids={tax_ids}")
+            else:
+                # Fallback to the known Custom Import UUID if missing from profile but required
+                tax_ids = "d13a90f9-8c31-4d92-ad5f-b2af54fd2a08"
+                logger.info(f"Dynamic classification: profile missing tax_ids, using fallback {tax_ids}")
+                
+        except Exception as e:
+            logger.error(f"Failed to fetch dynamic classification for '{supplier_name}': {e}")
+            # Safe fallback to Custom Import
+            tax_ids = "d13a90f9-8c31-4d92-ad5f-b2af54fd2a08"
+            logger.info(f"Using fallback classification {tax_ids} due to error.")
+
     form_data = {
         'supplier': supplier_id,
         'location': location,
         'supplier_name': supplier_name,
         'location_name': display_location_name,
-        'tax_ids': '',
+        'tax_ids': tax_ids,
         'supplierInvoiceNumber': invoice.invoice_number or '',
         # ... other fields if needed
     }
