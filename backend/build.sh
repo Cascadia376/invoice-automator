@@ -16,6 +16,9 @@ echo "Installing dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
 
+echo "Installing Playwright browsers..."
+playwright install chromium
+
 # Explicitly try installing openai if it's missing
 if ! python -c "import openai" &> /dev/null; then
     echo "OpenAI not found after requirements install. Attempting explicit install..."

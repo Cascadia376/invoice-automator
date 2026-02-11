@@ -36,3 +36,9 @@ sql_app.db
 *.txt
 !*.local
 !*.example
+
+# Stellar Browser Agent
+.stellar_auth_state.json
+stellar_screenshots/
+backend/.stellar_auth_state.json
+backend/stellar_screenshots/

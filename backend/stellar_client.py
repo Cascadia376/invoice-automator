@@ -48,7 +48,8 @@ class StellarClient:
         supplier_name: str,
         location_name: str, 
         invoice_number: str,
-        csv_file: Any # BytesIO or similar file-like object
+        csv_file: Any, # BytesIO or similar file-like object
+        tax_ids: Optional[str] = None
     ) -> Dict:
         """
         Post an invoice CSV to Stellar.
@@ -66,6 +67,7 @@ class StellarClient:
             'supplier_name': supplier_name,
             'location_name': location_name,
             'supplierInvoiceNumber': invoice_number,
+            'tax_ids': tax_ids
         }
         
         files = {
