@@ -110,11 +110,7 @@ def validate_item_against_master(db: Session, org_id: str, item: Dict) -> Dict:
         if variance > 0.05:
             flags.append(f"Cost Spike: +{variance*100:.1f}% vs Last Cost (${product.last_cost})")
             
-    # 3. Check Quantity Anomaly
-    qty = float(item.get("quantity", 0.0))
-    if product.max_typical_qty and qty > product.max_typical_qty:
-        flags.append(f"Abnormal Qty: {qty} is above typical max ({product.max_typical_qty})")
-        
+    # 3. Quantity anomaly check removed — max_typical_qty not in DB
     return {
         "status": "success",
         "product_id": product.sku,
