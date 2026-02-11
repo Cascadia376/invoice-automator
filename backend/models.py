@@ -30,6 +30,11 @@ class Invoice(Base):
     vendor_id = Column(String, ForeignKey("vendors.id"), nullable=True)
     is_posted = Column(Boolean, default=False)
     
+    # Store routing fields
+    store_id = Column(Integer, nullable=True, index=True)  # FK to store.store_id
+    destination_license = Column(String, nullable=True)  # License number extracted from invoice
+    destination_store_name = Column(String, nullable=True)  # Store name extracted from invoice
+    
     # Stellar POS integration fields
     stellar_posted_at = Column(DateTime, nullable=True)
     stellar_asn_number = Column(String, nullable=True, index=True)
@@ -97,9 +102,12 @@ class Store(Base):
 
     store_id = Column(Integer, primary_key=True, index=True)
     name = Column(String)
+    location = Column(String, nullable=True)
     organization_id = Column(String, nullable=True)
     access_code = Column(String, nullable=True)
     status = Column(String, default="active")
+    license_number = Column(String, nullable=True, index=True)
+    external_id = Column(String, nullable=True)  # Stellar warehouse UUID
     
     # Stellar POS integration fields
     stellar_tenant = Column(String, nullable=True)

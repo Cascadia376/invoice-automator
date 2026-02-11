@@ -366,10 +366,18 @@ async def post_invoice_if_configured(
         logger.debug(msg)
         return None
     
-    # Get store configuration for overrides
-    store = db.query(models.Store).filter(
-        models.Store.organization_id == invoice.organization_id
-    ).first()
+    # Get store configuration — prefer invoice's resolved store_id
+    store = None
+    if hasattr(invoice, 'store_id') and invoice.store_id:
+        store = db.query(models.Store).filter(
+            models.Store.store_id == invoice.store_id
+        ).first()
+        logger.info(f"Store resolved from invoice.store_id={invoice.store_id}: {store.name if store else 'NOT FOUND'}")
+    
+    if not store:
+        store = db.query(models.Store).filter(
+            models.Store.organization_id == invoice.organization_id
+        ).first()
     
     tenant_id = None
     location_id = None
@@ -483,9 +491,14 @@ def check_invoice_preflight(db: Session, invoice_ids: List[str]) -> Dict:
 
             
         # Check 5: Store Configuration (Tenant/Location)
-        # Verify if store has credentials or override
+        # Prefer invoice's resolved store_id, fallback to org lookup
         if not is_blocked:
-            store = db.query(models.Store).filter(models.Store.organization_id == inv.organization_id).first()
+            store = None
+            if hasattr(inv, 'store_id') and inv.store_id:
+                store = db.query(models.Store).filter(models.Store.store_id == inv.store_id).first()
+            if not store:
+                store = db.query(models.Store).filter(models.Store.organization_id == inv.organization_id).first()
+            
             tenant = getattr(store, 'stellar_tenant', None) or STELLAR_TENANT_ID
             location = getattr(store, 'stellar_location_id', None) or STELLAR_LOCATION_ID
             

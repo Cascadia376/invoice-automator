@@ -177,10 +177,19 @@ def extract_invoice_with_textract(s3_bucket: str, s3_key: str) -> Optional[Dict]
             subtotal = calculated_subtotal
             total_amount = calculated_subtotal + tax_amount + deposit_amount
         
+        # Extract receiver/destination info for store routing
+        receiver_name = clean_text(summary_fields.get('RECEIVER_NAME', {}).get('value', ''))
+        receiver_address = clean_text(summary_fields.get('RECEIVER_ADDRESS', {}).get('value', ''))
+        vendor_address = clean_text(summary_fields.get('VENDOR_ADDRESS', {}).get('value', ''))
+        
+        # Build full raw results dict for store routing to search
+        all_raw_fields = {k: v['value'] for k, v in summary_fields.items()}
+        
         # Map to our schema (with safe number parsing and text cleanup)
         extracted_data = {
             'invoice_number': summary_fields.get('INVOICE_RECEIPT_ID', {}).get('value', 'UNKNOWN'),
             'vendor_name': clean_text(summary_fields.get('VENDOR_NAME', {}).get('value', 'Unknown Vendor')),
+            'vendor_address': vendor_address,
             'date': parse_date(summary_fields.get('INVOICE_RECEIPT_DATE', {}).get('value', '')),
             'total_amount': total_amount,
             'subtotal': subtotal,
@@ -190,7 +199,9 @@ def extract_invoice_with_textract(s3_bucket: str, s3_key: str) -> Optional[Dict]
             'discount_amount': 0.0,
             'currency': 'CAD',
             'line_items': line_items,
-            'raw_extraction_results': json.dumps({k: v['value'] for k, v in summary_fields.items()}) # Mask confidences for learning
+            'receiver_name': receiver_name,
+            'receiver_address': receiver_address,
+            'raw_extraction_results': json.dumps(all_raw_fields)
         }
         
         # Calculate average confidence

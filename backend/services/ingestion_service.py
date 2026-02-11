@@ -1,10 +1,12 @@
 import os
 import uuid
+import json
 import shutil
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 import models
 from services import parser, vendor_service, product_service, storage
+from services import store_routing_service
 from services.textract_service import parse_float
 
 def process_invoice(
@@ -59,12 +61,46 @@ def process_invoice(
             if validation.get("master_category"):
                 item["category_gl_code"] = validation["master_category"]
 
-    # 6. Create DB Entry (Invoice)
+    # 6. Store Routing - resolve destination store from extracted license number
+    resolved_store = None
+    destination_license = None
+    destination_store_name = None
+    
+    try:
+        # Build the fields dict for store routing to search
+        raw_fields = {}
+        raw_str = extracted_data.get('raw_extraction_results', '{}')
+        if raw_str:
+            try:
+                raw_fields = json.loads(raw_str)
+            except:
+                pass
+        # Also add receiver fields directly
+        if extracted_data.get('receiver_name'):
+            raw_fields['receiver_name'] = extracted_data['receiver_name']
+        if extracted_data.get('receiver_address'):
+            raw_fields['receiver_address'] = extracted_data['receiver_address']
+        if extracted_data.get('vendor_address'):
+            raw_fields['vendor_address'] = extracted_data['vendor_address']
+            
+        resolved_store, destination_license = store_routing_service.resolve_store(
+            db, raw_fields, org_id
+        )
+        if resolved_store:
+            destination_store_name = resolved_store.name
+            print(f"Ingestion Service: Store routed -> {resolved_store.name} (License: {destination_license})")
+        else:
+            print(f"Ingestion Service: No store resolved (License found: {destination_license})")
+    except Exception as e:
+        print(f"WARNING: Store routing failed: {e}")
+
+    # 7. Create DB Entry (Invoice)
     db_invoice = models.Invoice(
         id=file_id,
         organization_id=org_id,
         invoice_number=extracted_data.get("invoice_number", "UNKNOWN"),
         vendor_name=extracted_data.get("vendor_name", "Unknown Vendor"),
+        vendor_address=extracted_data.get("vendor_address"),
         date=extracted_data.get("date"),
         total_amount=extracted_data.get("total_amount", 0.0),
         subtotal=extracted_data.get("subtotal", 0.0),
@@ -77,7 +113,10 @@ def process_invoice(
         status="needs_review",
         file_url=s3_key,
         raw_extraction_results=extracted_data.get("raw_extraction_results"),
-        vendor_id=vendor.id
+        vendor_id=vendor.id,
+        store_id=resolved_store.store_id if resolved_store else None,
+        destination_license=destination_license,
+        destination_store_name=destination_store_name
     )
 
     # 7. Save Line Items
