@@ -56,7 +56,7 @@ def extract_invoice_data(file_path: str, org_id: str, s3_key: str = None, s3_buc
             
             if has_line_items:
                 print(f"✅ Successfully extracted using template: {result.get('issuer', 'Unknown')}")
-                return mapped_result
+                return [mapped_result] # Return as a list
             else:
                 print(f"⚠️ Template matched but no line items found. Falling back to LLM.")
         else:
@@ -104,25 +104,26 @@ def extract_with_llm_and_learn(file_path: str, org_id: str, s3_key: str = None, 
             # TRY TEXTRACT FIRST (if S3 info provided)
             if s3_key and s3_bucket:
                 print("DEBUG: Attempting Textract extraction...")
-                textract_data = textract_service.extract_invoice_with_textract(s3_bucket, s3_key)
-                
-                if textract_data:
-                    # Quality check on Textract results
-                    is_high_quality = True
+                textract_data_list = textract_service.extract_invoice_with_textract(s3_bucket, s3_key)
+                if textract_data_list:
+                    # Filter for high quality results
+                    high_quality_results = []
+                    for doc in textract_data_list:
+                        is_hq = True
+                        if doc.get("total_amount") == 0.0 and not doc.get("line_items"):
+                            is_hq = False
+                            print("Textract Quality Check Failed: No total amount or line items")
+                        if doc.get("vendor_name") == "Unknown Vendor":
+                            is_hq = False
+                            print("Textract Quality Check Failed: Vendor name unknown")
+                        if is_hq:
+                            high_quality_results.append(doc)
                     
-                    if textract_data.get("total_amount") == 0.0 and not textract_data.get("line_items"):
-                        is_high_quality = False
-                        print("Textract Quality Check Failed: No total amount or line items")
-                    
-                    if textract_data.get("vendor_name") == "Unknown Vendor":
-                        is_high_quality = False
-                        print("Textract Quality Check Failed: Vendor name unknown")
-                    
-                    if is_high_quality:
-                        print("✅ Textract extraction successful and high quality!")
-                        return textract_data
+                    if high_quality_results:
+                        print(f"✅ Textract extraction successful! Found {len(high_quality_results)} high-quality invoices.")
+                        return high_quality_results
                     else:
-                        print("⚠️ Textract quality low, falling back to GPT-4o Vision...")
+                        print("⚠️ Textract returned low quality results, falling back to GPT-4o Vision...")
                 else:
                     print("⚠️ Textract extraction failed, falling back to GPT-4o Vision...")
             else:
@@ -135,8 +136,9 @@ def extract_with_llm_and_learn(file_path: str, org_id: str, s3_key: str = None, 
             doc = fitz.open(file_path)
             image_contents = []
             
-            # Process ONLY first page to reduce memory usage (most invoices are 1 page)
-            for i in range(min(len(doc), 1)):
+            # Limit to 10 pages for multi-invoice scans
+            max_pages = min(len(doc), 10)
+            for i in range(max_pages):
                 page = doc.load_page(i)
                 pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5)) # Reduced from 2x to 1.5x to save memory
                 img_data = pix.tobytes("png")
@@ -201,9 +203,10 @@ CRITICAL INSTRUCTIONS FOR LINE ITEMS:
   * "MISC" (Deposits, Freight, Supplies, adjusters)
   * "MIX & CONFEC" (Non-alc, Soda, Juice, Snacks, Garnish)
 
-Return a JSON object with two keys: "data" and "template".
+Return a JSON object with two keys: "invoices" (a list of data objects) and "template" (a string).
+If there is ONLY ONE invoice, still return it as a list with one item in "invoices".
 
-"data" must match this structure:
+"invoices" entry structure:
 {
     "invoice_number": "str",
     "po_number": "str",
@@ -235,7 +238,7 @@ Confidence score guidelines:
 - 0.4-0.6: Data is difficult to read or requires inference
 - 0.0-0.3: Data is missing or completely illegible, you're guessing
 
-"template" must be a valid YAML string for invoice2data.
+"template" must be a valid YAML string for invoice2data. (Generate ONE template for the primary vendor if multiple are different, but usually they are the same in one file).
 
 CRITICAL TEMPLATE RULES:
 1. 'issuer' field is REQUIRED.
@@ -278,54 +281,80 @@ options:
         content = response.choices[0].message.content
         print(f"DEBUG: LLM Response: {content[:500]}...") # Log first 500 chars
         result = json.loads(content)
-        data = result.get("data", {})
         
-        # Quality Check
-        is_high_quality = True
-        
-        # Check 1: Critical fields present?
-        if data.get("total_amount") == 0.0 and not data.get("line_items"):
-            is_high_quality = False
-            print("Quality Check Failed: No total amount or line items found.")
+        outputs = []
+        for invoice_data in result.get("invoices", []):
+            # Quality Check for individual invoice
+            is_high_quality = True
             
-        if data.get("vendor_name") == "UNKNOWN" or not data.get("vendor_name"):
-             is_high_quality = False
-             print("Quality Check Failed: Vendor name unknown.")
-
-        # Check 2: Confidence scores (if available)
-        avg_score = 0.0
-        if data.get("line_items"):
-            scores = [item.get("confidence_score", 0) for item in data["line_items"]]
-            avg_score = sum(scores) / len(scores) if scores else 0
-            if avg_score < 0.7:
+            # Check 1: Critical fields present?
+            if invoice_data.get("total_amount") == 0.0 and not invoice_data.get("line_items"):
                 is_high_quality = False
-                print(f"Quality Check Failed: Low average confidence score ({avg_score:.2f})")
-        
-        # Log quality check results
-        print(f"Quality Check: total_amount={data.get('total_amount')}, vendor={data.get('vendor_name')}, line_items={len(data.get('line_items', []))}, avg_confidence={avg_score:.2f}, is_high_quality={is_high_quality}")
+                print("Quality Check Failed: No total amount or line items found.")
+                
+            if invoice_data.get("vendor_name") == "UNKNOWN" or not invoice_data.get("vendor_name"):
+                 is_high_quality = False
+                 print("Quality Check Failed: Vendor name unknown.")
 
-        # RETRY with GPT-4o if quality is low AND it was a scanned doc (vision)
-        # (For text-based, switching models might not help as much as vision)
-        if not is_high_quality and is_scanned:
-            print("⚠️ Extraction quality low. Retrying with GPT-4o (High Cost Model)...")
+            # Check 2: Confidence scores (if available)
+            avg_score = 0.0
+            if invoice_data.get("line_items"):
+                scores = [item.get("confidence_score", 0) for item in invoice_data["line_items"]]
+                avg_score = sum(scores) / len(scores) if scores else 0
+                if avg_score < 0.7:
+                    is_high_quality = False
+                    print(f"Quality Check Failed: Low average confidence score ({avg_score:.2f})")
             
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=messages,
-                response_format={"type": "json_object"},
-                temperature=0
-            )
-            content = response.choices[0].message.content
-            result = json.loads(content)
-            print("GPT-4o extraction complete.")
+            # Log quality check results
+            print(f"Quality Check: total_amount={invoice_data.get('total_amount')}, vendor={invoice_data.get('vendor_name')}, line_items={len(invoice_data.get('line_items', []))}, avg_confidence={avg_score:.2f}, is_high_quality={is_high_quality}")
 
+            # RETRY with GPT-4o if quality is low AND it was a scanned doc (vision)
+            # (For text-based, switching models might not help as much as vision)
+            if not is_high_quality and is_scanned:
+                print("⚠️ Extraction quality low. Retrying with GPT-4o (High Cost Model)...")
+                
+                response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=messages,
+                    response_format={"type": "json_object"},
+                    temperature=0
+                )
+                content = response.choices[0].message.content
+                result = json.loads(content)
+                print("GPT-4o extraction complete.")
+                # Re-evaluate the result from GPT-4o
+                invoice_data = result.get("invoices", [{}])[0] # Assuming GPT-4o also returns a list, take the first one for simplicity in retry
+                
+            vendor_name = invoice_data.get("vendor_name", "unknown")
+            
+            # --- MATH VALIDATION ---
+            for item in invoice_data.get("line_items", []):
+                try:
+                    qty = safe_float(item.get("quantity"))
+                    cost = safe_float(item.get("unit_cost"))
+                    amt = safe_float(item.get("amount"))
+                    
+                    # Allow for tiny rounding differences (±0.02)
+                    if qty > 0 and abs((qty * cost) - amt) > 0.02:
+                        print(f"DEBUG: Math mismatch on {item.get('description')}: {qty} * {cost} = {qty*cost} (Invoice says {amt})")
+                        # Automatically fix the amount if it's clearly a parsing error and cost/qty look reliable
+                        # Or just mark it for user review if it's suspicious. For now, we trust the math.
+                        item["amount"] = round(qty * cost, 2)
+                except Exception as math_err:
+                    print(f"Error during math validation for item {item.get('description')}: {math_err}")
+            
+            invoice_data["currency"] = normalize_currency(invoice_data.get("currency"))
+            invoice_data["raw_extraction_results"] = json.dumps(invoice_data) # Store for learning
+            outputs.append(invoice_data)
+
+        # Handle template saving once for the primary vendor (first invoice in the list)
         if "template" in result and result["template"]:
             template_content = result["template"]
-            vendor_name = data.get("vendor_name", "unknown")
+            primary_vendor = outputs[0].get("vendor_name", "unknown") if outputs else "unknown"
             
             # Basic YAML syntax fix-up: Ensure keywords exist if LLM forgot
             if "keywords:" not in template_content:
-                template_content = f"keywords:\n  - \"{vendor_name}\"\n" + template_content
+                template_content = f"keywords:\n  - \"{primary_vendor}\"\n" + template_content
                 
             try:
                 # Validate YAML
@@ -335,35 +364,20 @@ options:
                 
                 # If keywords is missing but loaded as dict, add it
                 if "keywords" not in parsed_yaml or not parsed_yaml["keywords"]:
-                    parsed_yaml["keywords"] = [vendor_name]
+                    parsed_yaml["keywords"] = [primary_vendor]
                     template_content = yaml.dump(parsed_yaml, sort_keys=False)
 
-                save_new_template(template_content, vendor_name, org_id)
+                save_new_template(template_content, primary_vendor, org_id)
             except Exception as yaml_err:
                 print(f"WARNING: Generated template invalid, skipping save: {yaml_err}")
-            
-        final_data = result.get("data", {})
-        final_data["currency"] = normalize_currency(final_data.get("currency"))
-        final_data["raw_extraction_results"] = json.dumps(result.get("data", {})) # Store for learning
         
-        # --- MATH VALIDATION ---
-        for item in final_data.get("line_items", []):
-            qty = safe_float(item.get("quantity"))
-            cost = safe_float(item.get("unit_cost"))
-            amt = safe_float(item.get("amount"))
-            
-            # Allow for tiny rounding differences (±0.02)
-            if abs((qty * cost) - amt) > 0.02:
-                print(f"DEBUG: Math mismatch on {item.get('description')}: {qty} * {cost} = {qty*cost} (Invoice says {amt})")
-                # Automatically fix the amount if it's clearly a parsing error and cost/qty look reliable
-                # Or just mark it for user review if it's suspicious. For now, we trust the math.
-                item["amount"] = round(qty * cost, 2)
-        
-        return final_data
+        return outputs
 
     except Exception as e:
         print(f"LLM Extraction failed: {e}")
-        return empty_invoice_data()
+        import traceback
+        traceback.print_exc()
+        return [empty_invoice_data()]
 
 def save_new_template(template_content: str, vendor_name: str, org_id: str):
     db = SessionLocal()

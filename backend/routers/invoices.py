@@ -68,14 +68,14 @@ async def upload_invoice(
         created_invoices = []
         for file_path in files_to_process:
             try:
-                invoice = ingestion_service.process_invoice(
+                invoices = ingestion_service.process_invoice(
                     db=db,
                     file_path=file_path,
                     org_id=ctx.org_id,
                     user_id=ctx.user_id,
                     original_filename=file.filename
                 )
-                created_invoices.append(invoice)
+                created_invoices.extend(invoices)
             except Exception as proc_error:
                 print(f"ERROR processing file {file_path}: {proc_error}")
                 import traceback
