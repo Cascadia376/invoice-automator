@@ -491,6 +491,8 @@ def check_invoice_preflight(db: Session, invoice_ids: List[str]) -> Dict:
             tenant = getattr(store, 'stellar_tenant', None) or STELLAR_TENANT_ID
             location = getattr(store, 'stellar_location_id', None) or STELLAR_LOCATION_ID
             
+            print(f"DEBUG STORE CONFIG: Tenant={tenant} (Env: {STELLAR_TENANT_ID}), Location={location} (Env: {STELLAR_LOCATION_ID})")
+            
             if not tenant or not location:
                  issues.append({
                     "invoice_id": inv.id,
