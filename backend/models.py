@@ -240,8 +240,6 @@ class Product(Base):
     units_per_case = Column(Integer, default=1)
     average_cost = Column(Float, default=0.0)
     last_cost = Column(Float, default=0.0)
-    min_typical_qty = Column(Float, nullable=True)
-    max_typical_qty = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
