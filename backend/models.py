@@ -344,3 +344,10 @@ class StellarSupplier(Base):
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class SyncState(Base):
+    __tablename__ = "sync_states"
+    id = Column(String, primary_key=True) # e.g. "onedrive_invoices" or "email_invoices"
+    organization_id = Column(String, index=True)
+    delta_token = Column(String, nullable=True) # For OneDrive Delta Query
+    last_sync_at = Column(DateTime, default=datetime.utcnow)

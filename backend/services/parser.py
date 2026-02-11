@@ -13,6 +13,7 @@ from invoice2data.extract.loader import read_templates
 from database import SessionLocal
 import models
 from services import textract_service
+import yaml
 import tempfile
 
 def normalize_currency(currency: str) -> str:
@@ -234,16 +235,26 @@ Confidence score guidelines:
 - 0.4-0.6: Data is difficult to read or requires inference
 - 0.0-0.3: Data is missing or completely illegible, you're guessing
 
-"template" must be a valid YAML string for invoice2data, like:
-issuer: Vendor Name
+"template" must be a valid YAML string for invoice2data.
+
+CRITICAL TEMPLATE RULES:
+1. 'issuer' field is REQUIRED.
+2. 'keywords' field is REQUIRED and MUST be a list. Use the vendor name and one other unique word from the invoice.
+3. 'fields' MUST contain 'amount', 'invoice_number', and 'date'.
+4. ALL regex patterns MUST be wrapped in double quotes to avoid YAML syntax errors.
+5. Use 'options' to specify the currency as CAD.
+
+Example Template:
+issuer: "Vendor Name"
 keywords:
-  - Keyword1
+  - "Vendor"
+  - "UniqueWord"
 fields:
-  amount: Total\\s+([\\d,]+\\.\\d{2})
-  invoice_number: Invoice\\s+#(\\d+)
-  date: Date\\s+(\\d{4}-\\d{2}-\\d{2})
+  amount: "Total\\s+([\\d,]+\\.\\d{2})"
+  invoice_number: "Invoice\\s+#(\\d+)"
+  date: "Date\\s+(\\d{4}-\\d{2}-\\d{2})"
 options:
-  currency: CAD
+  currency: "CAD"
 """
 
         # Prepend system prompt to messages
@@ -309,7 +320,27 @@ options:
             print("GPT-4o extraction complete.")
 
         if "template" in result and result["template"]:
-            save_new_template(result["template"], result["data"].get("vendor_name", "unknown"), org_id)
+            template_content = result["template"]
+            vendor_name = data.get("vendor_name", "unknown")
+            
+            # Basic YAML syntax fix-up: Ensure keywords exist if LLM forgot
+            if "keywords:" not in template_content:
+                template_content = f"keywords:\n  - \"{vendor_name}\"\n" + template_content
+                
+            try:
+                # Validate YAML
+                parsed_yaml = yaml.safe_load(template_content)
+                if not isinstance(parsed_yaml, dict) or "issuer" not in parsed_yaml:
+                    raise ValueError("Template missing 'issuer' or invalid structure")
+                
+                # If keywords is missing but loaded as dict, add it
+                if "keywords" not in parsed_yaml or not parsed_yaml["keywords"]:
+                    parsed_yaml["keywords"] = [vendor_name]
+                    template_content = yaml.dump(parsed_yaml, sort_keys=False)
+
+                save_new_template(template_content, vendor_name, org_id)
+            except Exception as yaml_err:
+                print(f"WARNING: Generated template invalid, skipping save: {yaml_err}")
             
         final_data = result.get("data", {})
         final_data["currency"] = normalize_currency(final_data.get("currency"))

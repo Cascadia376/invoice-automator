@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from database import SessionLocal
 import models
 import traceback
+from services.automation_service import AutomationService
 
 logger = logging.getLogger(__name__)
 
@@ -88,3 +89,18 @@ class JobManager:
 
 # Global Job Manager Instance
 job_manager = JobManager()
+
+# --- Job Handlers ---
+
+def automation_sync_handler(payload: Dict[str, Any], db: Session):
+    """Handler for syncing external sources (Email/OneDrive)."""
+    service = AutomationService(db)
+    
+    # Run syncs
+    service.sync_email_invoices()
+    service.sync_onedrive_invoices()
+    
+    return {"status": "success", "timestamp": datetime.utcnow().isoformat()}
+
+# Register handlers
+job_manager.register("automation_sync", automation_sync_handler)
