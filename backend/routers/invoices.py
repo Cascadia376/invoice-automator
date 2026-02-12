@@ -82,6 +82,11 @@ async def upload_invoice(
         if not created_invoices:
             raise HTTPException(status_code=500, detail="Failed to process any invoices from the uploaded file")
 
+        # Point to proxy endpoint
+        for inv in created_invoices:
+            if inv.file_url:
+                 inv.file_url = f"/api/invoices/{inv.id}/file"
+
         return created_invoices
     except Exception as e:
         import traceback
@@ -275,6 +280,7 @@ def get_invoice_file(
         raise HTTPException(status_code=404, detail="File not found")
         
     s3_key = invoice.file_url
+    print(f"DEBUG: Proxying PDF for invoice {invoice_id}. S3 Key: {s3_key}")
     # Validate key does not look like a proxy URL (DB corruption check)
     if s3_key.startswith("/api/"):
         logger.error(f"Invalid S3 Key in DB for invoice {invoice_id}: {s3_key}")

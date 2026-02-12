@@ -31,7 +31,7 @@ def process_invoice(
     s3_key = f"invoices/{org_id}/{file_uuid}{file_ext}"
     s3_bucket = os.getenv("AWS_BUCKET_NAME", "swift-invoice-zen-uploads")
     print(f"Ingestion Service: Uploading to S3: {s3_key}")
-    storage.upload_file(file_path, s3_key)
+    storage.upload_file(file_path, s3_key, content_type="application/pdf")
     
     # 2. Parse PDF (Returns a list of extracted data dicts)
     print("Ingestion Service: Starting PDF parsing...")

@@ -150,7 +150,7 @@ def split_pdf_into_files(original_file_path: str, ranges: List[Dict[str, Any]]) 
             
             file_id = str(uuid.uuid4())
             new_path = os.path.join(temp_dir, f"{file_id}.pdf")
-            new_doc.save(new_path)
+            new_doc.save(new_path, garbage=3, deflate=True)
             
             new_doc.close()
             doc.close()
