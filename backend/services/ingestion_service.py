@@ -143,10 +143,5 @@ def process_invoice(
 
     db.commit()
     
-    for inv in created_invoices:
-        db.refresh(inv)
-        if inv.file_url and not inv.file_url.startswith("http"):
-            inv.file_url = storage.get_presigned_url(inv.file_url)
-            
     print(f"Ingestion complete: {len(created_invoices)} invoices created.")
     return created_invoices

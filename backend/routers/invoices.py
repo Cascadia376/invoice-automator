@@ -281,8 +281,19 @@ def get_invoice_file(
         
     s3_key = invoice.file_url
     print(f"DEBUG: Proxying PDF for invoice {invoice_id}. S3 Key: {s3_key}")
+    
+    # Check if the key is actually a full URL (Robustness against DB corruption)
+    if s3_key and s3_key.startswith("http"):
+        # Extract the key path from the S3 URL
+        # Example: https://bucket.s3.amazonaws.com/invoices/org/file.pdf?params...
+        from urllib.parse import urlparse
+        parsed = urlparse(s3_key)
+        # The path starts with /, we usually want it without / for S3 Key if it's relative
+        s3_key = parsed.path.lstrip("/")
+        print(f"DEBUG: Extracted S3 Key from URL: {s3_key}")
+
     # Validate key does not look like a proxy URL (DB corruption check)
-    if s3_key.startswith("/api/"):
+    if s3_key and s3_key.startswith("/api/"):
         logger.error(f"Invalid S3 Key in DB for invoice {invoice_id}: {s3_key}")
         raise HTTPException(status_code=500, detail="Invalid file reference in database")
 
