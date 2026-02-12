@@ -80,10 +80,10 @@ class StorageClient:
 storage_client = StorageClient()
 
 # --- Legacy Adapters for Backward Compatibility ---
-def upload_file(file_path: str, object_name: str = None):
+def upload_file(file_path: str, object_name: str = None, content_type: str = None):
     if object_name is None:
         object_name = os.path.basename(file_path)
-    return storage_client.upload(file_path, object_name)
+    return storage_client.upload(file_path, object_name, content_type=content_type)
 
 def get_presigned_url(object_name: str, expiration=3600):
     return storage_client.get_url(object_name, expiration)
