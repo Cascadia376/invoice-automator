@@ -38,9 +38,24 @@ async def upload_invoice(
         raise HTTPException(status_code=401, detail="Authentication required")
         
     print(f"UPLOAD REQUEST: User={ctx.user_id}, Org={ctx.org_id}, File={file.filename}")
+    
+    # --- Upload Hygiene ---
+    ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
+    ALLOWED_TYPES = {"application/pdf", "image/jpeg", "image/png"}
+    
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
+         print(f"SECURITY: Rejected file extension {file_ext}")
+         raise HTTPException(status_code=400, detail=f"File type not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}")
+
+    if file.content_type not in ALLOWED_TYPES:
+         print(f"SECURITY: Rejected content type {file.content_type}")
+         raise HTTPException(status_code=400, detail="Invalid content type")
+    # ----------------------
+
     try:
         file_id = str(uuid.uuid4())
-        file_ext = os.path.splitext(file.filename)[1].lower()
+        # file_ext already calculated above
         temp_dir = tempfile.gettempdir()
         original_temp_path = os.path.join(temp_dir, f"original_{file_id}{file_ext}")
         

@@ -110,70 +110,7 @@ def inspect_schema(db: Session = Depends(get_db)):
         "schema": schema_info
     }
 
-from pydantic import BaseModel
 
-class SQLRequest(BaseModel):
-    query: str
-
-@router.post("/api/debug/sql")
-def execute_raw_sql(
-    sql_req: SQLRequest,
-    db: Session = Depends(get_db),
-    ctx: auth.UserContext = Depends(auth.get_current_user)
-):
-    """
-    Emergency endpoint to run raw SQL. 
-    Use with EXTREME CAUTION.
-    """
-    from sqlalchemy import text
-    try:
-        result = db.execute(text(sql_req.query))
-        db.commit()
-        
-        # Try to fetch results if it's a SELECT
-        try:
-            keys = result.keys()
-            rows = [dict(zip(keys, row)) for row in result.fetchall()]
-            return {"status": "success", "rows": rows}
-        except:
-            return {"status": "success", "message": "Command executed, no rows returned"}
-            
-    except Exception as e:
-        import traceback
-        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
-
-@router.post("/api/debug/bootstrap-admin")
-def bootstrap_admin_role(
-    db: Session = Depends(get_db),
-    ctx: auth.UserContext = Depends(auth.get_current_user)
-):
-    """
-    Emergency endpoint to promote the CURRENT user to admin.
-    Does NOT require admin role (obviously).
-    """
-    try:
-        # Check if already has admin role
-        existing = db.query(models.UserRole).filter(
-            models.UserRole.user_id == ctx.user_id,
-            models.UserRole.role_id == "admin",
-            models.UserRole.organization_id == ctx.org_id
-        ).first()
-
-        if existing:
-            return {"status": "success", "message": "User is already admin", "user_id": ctx.user_id}
-
-        # Insert admin role
-        new_role = models.UserRole(
-            user_id=ctx.user_id,
-            role_id="admin",
-            organization_id=ctx.org_id
-        )
-        db.add(new_role)
-        db.commit()
-        return {"status": "success", "message": "User promoted to admin", "user_id": ctx.user_id}
-    except Exception as e:
-        import traceback
-        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
 
 @router.get("/api/debug/org-context")
 def debug_org_context(

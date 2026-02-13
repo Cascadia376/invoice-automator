@@ -180,9 +180,6 @@ async def get_current_user(
             if user_has_access:
                 # logger.info(f"AUTH SWAP: User {ctx.user_id} switched to Org {x_organization_id}")
                 ctx.org_id = x_organization_id
-            elif ctx.email == "jay@trufflesgroup.com" or ctx.email == "dev@example.com":
-                 # SUPER ADMIN BYPASS
-                 ctx.org_id = x_organization_id
             else:
                 logger.warning(f"AUTH FAIL: User {ctx.user_id} attempted to access Org {x_organization_id} without role")
                 # We do NOT throw here to avoid breaking the request if it was just a hint? 
@@ -216,12 +213,11 @@ class RoleChecker:
         self.allowed_roles = allowed_roles
 
     def __call__(self, ctx: Optional[UserContext] = Depends(get_current_user), db = Depends(get_db)):
-        # Bypass role checks in log-only or disabled modes to prevent disruption during rollout
-        if DISABLE_AUTH or AUTH_MODE == "log-only" or (not AUTH_REQUIRED and not ctx):
+        # Bypass role checks ONLY in explicit dev modes
+        if DISABLE_AUTH:
             # Mock context for bypass
             bypass_role = "admin"
             if self.allowed_roles:
-                 # allowed_roles might be a set or string depending on initialization (handled in __init__ but safe to check)
                  if isinstance(self.allowed_roles, set):
                      bypass_role = list(self.allowed_roles)[0]
                  else:
@@ -238,11 +234,6 @@ class RoleChecker:
 
         import models
         
-        # SUPER ADMIN BYPASS
-        if ctx.email == "jay@trufflesgroup.com" or ctx.email == "dev@example.com":
-             ctx.role = "admin"
-             return ctx
-
         # Check if user has ANY of the allowed roles
         # We also check for 'admin' as a super-role that can access anything
         roles_to_check = self.allowed_roles.union({"admin"})
@@ -259,6 +250,6 @@ class RoleChecker:
                 detail=f"Operation requires one of roles: {self.allowed_roles}"
             )
             
-        # Return the UserContext object to match the type hint
+        # Return the UserContext object
         return ctx
 
