@@ -18,14 +18,6 @@ IS_PROD = ENV == "production"
 if IS_PROD:
     print("🔒 SECURITY: Production Mode Active")
     # Force strict auth in production
-    os.environ["AUTH_REQUIRED"] = "true"
-    os.environ["DISABLE_AUTH"] = "false"
-    
-    # Reload auth module to pick up environment changes if needed, 
-    # but since we set os.environ before accessing auth properties that usually read strictly from env, 
-    # we should check if auth needs re-initialization. 
-    # In this specific codebase, auth.py reads env vars at module level.
-    # To be safe, we verify compliance:
     if str(os.getenv("DISABLE_AUTH")).lower() == "true":
         print("❌ FATAL: DISABLE_AUTH=true is not allowed in production.")
         sys.exit(1)
@@ -33,9 +25,6 @@ if IS_PROD:
     if str(os.getenv("AUTH_REQUIRED", "false")).lower() != "true" and auth.AUTH_MODE == "strict":
          print("❌ FATAL: AUTH_REQUIRED must be true in production.")
          sys.exit(1)
-
-    # We do NOT mutate os.environ or auth module here to avoid side effects.
-    # We expect the environment to be correctly configured.
 
 ENABLE_DEBUG_ROUTES = os.getenv("ENABLE_DEBUG_ROUTES", "false").lower() == "true"
 
