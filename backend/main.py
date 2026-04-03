@@ -6,6 +6,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 import os
 import traceback
 import models, database, jobs
+import migrate
 from routers import invoices, vendors, gl_categories, debug, issues, admin, auth_router, stellar, reports
 import auth
 import sys
@@ -125,6 +126,7 @@ def initialize_database_schema() -> None:
     """Create missing tables without blocking application startup."""
     try:
         models.Base.metadata.create_all(bind=database.engine)
+        migrate.ensure_invoice_source_file_hash_column()
     except Exception as exc:
         print(f"DATABASE: Skipping create_all during startup: {exc}")
 
