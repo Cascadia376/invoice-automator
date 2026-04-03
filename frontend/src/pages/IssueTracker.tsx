@@ -16,6 +16,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { getApiBaseUrl } from "@/lib/apiBase";
 import { toast } from "sonner";
 import {
     Card,
@@ -52,7 +53,7 @@ export default function IssueTracker() {
     const fetchIssues = async () => {
         try {
             const token = await getToken();
-            const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+            const API_BASE = getApiBaseUrl();
             const response = await fetch(`${API_BASE}/api/issues`, {
                 headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
             });

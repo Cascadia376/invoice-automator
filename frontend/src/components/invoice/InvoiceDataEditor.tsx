@@ -21,6 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useInvoice } from "@/context/InvoiceContext";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import { getApiBaseUrl } from "@/lib/apiBase";
 import {
   Table,
   TableBody,
@@ -285,7 +286,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
       }
 
       const token = await getToken();
-      const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+      const API_BASE = getApiBaseUrl();
 
       const response = await fetch(`${API_BASE}/api/issues`, {
         method: 'POST',
@@ -318,7 +319,7 @@ export function InvoiceDataEditor({ data, onChange, onFieldFocus, validation }: 
     setIsSubmittingIssue(true);
     try {
       const token = await getToken();
-      const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+      const API_BASE = getApiBaseUrl();
 
       const response = await fetch(`${API_BASE}/api/issues/${issueId}`, {
         method: 'PUT',

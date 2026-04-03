@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useAuth } from "@/context/AuthContext";
 import { Invoice, DashboardStats, GLCategory } from '@/types/invoice';
 import { toast } from 'sonner';
+import { getApiBaseUrl } from "@/lib/apiBase";
 
 interface InvoiceContextType {
     invoices: Invoice[];
@@ -27,8 +28,7 @@ interface InvoiceContextType {
 
 const InvoiceContext = createContext<InvoiceContextType | undefined>(undefined);
 
-const API_BASE = import.meta.env.VITE_API_BASE ||
-    (import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000');
+const API_BASE = getApiBaseUrl();
 const API_URL = `${API_BASE}/api`;
 
 export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

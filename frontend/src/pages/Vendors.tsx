@@ -8,9 +8,9 @@ import { Building2, Search, TrendingUp, FileText, AlertCircle } from 'lucide-rea
 import { Vendor } from '@/types/vendor';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { getApiBaseUrl } from "@/lib/apiBase";
 
-const API_BASE = import.meta.env.VITE_API_BASE ||
-    (import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000');
+const API_BASE = getApiBaseUrl();
 
 export default function Vendors() {
     const [vendors, setVendors] = useState<Vendor[]>([]);

@@ -28,6 +28,7 @@ import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { useLocalDraft } from "@/hooks/useLocalDraft";
 import { useAuth } from "@/context/AuthContext";
+import { getApiBaseUrl } from "@/lib/apiBase";
 
 import { StellarPostModal } from "@/components/invoice/StellarPostModal";
 
@@ -56,12 +57,12 @@ export default function InvoiceReview() {
   const getPdfUrl = () => {
     if (!invoice?.fileUrl) return '';
     if (invoice.fileUrl.startsWith('http')) return invoice.fileUrl;
-    const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+    const API_BASE = getApiBaseUrl();
     return `${API_BASE}${invoice.fileUrl}`;
   };
 
   const pdfUrl = getPdfUrl();
-  const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+  const API_BASE = getApiBaseUrl();
 
   // Main Data Load
   const fetchInvoiceData = async () => {
@@ -424,7 +425,7 @@ export default function InvoiceReview() {
                 onClick={async () => {
                   if (!invoice) return;
                   try {
-                    const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+                    const API_BASE = getApiBaseUrl();
                     const token = await getToken();
 
                     const response = await fetch(`${API_BASE}/api/invoices/${invoice.id}/export/ldb`, {
@@ -467,7 +468,7 @@ export default function InvoiceReview() {
                   const savedColumns = localStorage.getItem("csv_export_columns");
                   const savedConfig = localStorage.getItem("csv_export_config");
 
-                  const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+                  const API_BASE = getApiBaseUrl();
                   // Token is already awaited due to 'await' keyword but verify context
                   const token = await getToken();
 

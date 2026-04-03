@@ -4,6 +4,7 @@ import { useInvoice } from "@/context/InvoiceContext";
 import { PDFViewer } from "@/components/invoice/PDFViewer";
 import { Invoice } from "@/types/invoice";
 import { Loader2 } from "lucide-react";
+import { getApiBaseUrl } from "@/lib/apiBase";
 
 export default function PDFViewOnly() {
     const { id } = useParams<{ id: string }>();
@@ -18,7 +19,7 @@ export default function PDFViewOnly() {
         if (directUrl) return directUrl;
         if (!invoice?.fileUrl) return '';
         if (invoice.fileUrl.startsWith('http')) return invoice.fileUrl;
-        const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+        const API_BASE = getApiBaseUrl();
         return `${API_BASE}${invoice.fileUrl}`;
     };
 

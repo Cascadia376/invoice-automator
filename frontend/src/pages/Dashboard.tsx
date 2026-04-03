@@ -5,6 +5,7 @@ import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Search, Plus, Inbox, Beaker, MoreVertical, AlertCircle, Clock, FileText, FileDown, Trash2, CheckCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { getApiBaseUrl } from "@/lib/apiBase";
 
 import { StellarPostModal } from "@/components/invoice/StellarPostModal";
 
@@ -41,7 +42,7 @@ export default function Dashboard() {
         setTroubleshootLoading(true);
         try {
             const token = await getToken();
-            const API_BASE = import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com';
+            const API_BASE = getApiBaseUrl();
             const res = await fetch(`${API_BASE}/api/debug/bootstrap-admin`, {
                 method: "POST",
                 headers: { Authorization: `Bearer ${token}` }
@@ -149,8 +150,7 @@ export default function Dashboard() {
         const toastId = toast.loading("Generating demo invoice...");
         try {
             const token = await getToken();
-            const API_BASE = import.meta.env.VITE_API_BASE ||
-                (import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000');
+            const API_BASE = getApiBaseUrl();
             const res = await fetch(`${API_BASE}/api/seed/demo`, {
                 method: "POST",
                 headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
@@ -197,7 +197,7 @@ export default function Dashboard() {
 
     const handleBulkExportExcel = async () => {
         setIsLoading(true);
-        const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+        const API_BASE = getApiBaseUrl();
         try {
             const ids = Array.from(selectedIds);
             const response = await fetch(`${API_BASE}/api/invoices/export/excel/bulk`, {
@@ -248,7 +248,7 @@ export default function Dashboard() {
         const toastId = toast.loading(`Preparing export for ${approvedInvoices.length} invoices...`);
         setIsLoading(true);
 
-        const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+        const API_BASE = getApiBaseUrl();
 
         try {
             const ids = approvedInvoices.map(i => i.id);

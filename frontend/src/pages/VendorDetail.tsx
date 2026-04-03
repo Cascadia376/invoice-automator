@@ -13,9 +13,9 @@ import { Vendor, VendorCorrection } from '@/types/vendor';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from '@/components/ui/use-toast';
 import { GlobalVendorMapping } from '@/types/vendor';
+import { getApiBaseUrl } from "@/lib/apiBase";
 
-const API_BASE = import.meta.env.VITE_API_BASE ||
-    (import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000');
+const API_BASE = getApiBaseUrl();
 
 export default function VendorDetail() {
     const { vendorId } = useParams();
