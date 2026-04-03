@@ -475,3 +475,21 @@ def check_connection(
         status_report["error"] = str(e)
         
     return status_report
+
+@router.get("/admin/health-details", dependencies=[Depends(auth.require_role("admin"))])
+def health_details(
+    db: Session = Depends(get_db),
+    ctx: auth.UserContext = Depends(auth.get_current_user)
+):
+    """
+    Detailed health check for admins (replaces public info leakage).
+    """
+    return {
+        "status": "ok", 
+        "version": "1.2.0",
+        "database": "postgres",
+        "auth_required": auth.AUTH_REQUIRED,
+        "supabase_url": bool(auth.SUPABASE_URL),
+        "supabase_jwt_secret_present": bool(auth.SUPABASE_JWT_SECRET),
+        "jwks_client_ready": bool(auth.jwks_cache.currsize > 0 if hasattr(auth.jwks_cache, "currsize") else "jwks" in auth.jwks_cache)
+    }

@@ -30,8 +30,12 @@ if IS_PROD:
         print("❌ FATAL: DISABLE_AUTH=true is not allowed in production.")
         sys.exit(1)
         
-    auth.AUTH_REQUIRED = True
-    auth.DISABLE_AUTH = False
+    if str(os.getenv("AUTH_REQUIRED", "false")).lower() != "true" and auth.AUTH_MODE == "strict":
+         print("❌ FATAL: AUTH_REQUIRED must be true in production.")
+         sys.exit(1)
+
+    # We do NOT mutate os.environ or auth module here to avoid side effects.
+    # We expect the environment to be correctly configured.
 
 ENABLE_DEBUG_ROUTES = os.getenv("ENABLE_DEBUG_ROUTES", "false").lower() == "true"
 
@@ -107,6 +111,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         client_ip = request.client.host
+        x_forwarded_for = request.headers.get("x-forwarded-for")
+        if x_forwarded_for:
+            # In production, we trust the first IP if behind a trusted proxy (e.g. Vercel/AWS LB)
+            # For now, we take the first one
+            client_ip = x_forwarded_for.split(",")[0].strip()
+
         now = time.time()
         
         # Clean up old requests
@@ -148,11 +158,9 @@ async def global_exception_handler(request: Request, exc: Exception):
         
     response = JSONResponse(status_code=500, content=response_content)
     
-    if origin and (origin in origins or ".vercel.app" in origin):
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "*"
-        response.headers["Access-Control-Allow-Headers"] = "*"
+    # SECURITY: Do NOT manually set CORS headers here. Let CORSMiddleware handle it.
+    # This prevents wildcard leakage on errors.
+    
     return response
 
 # Include Routers
@@ -172,14 +180,10 @@ app.include_router(reports.router)
 @app.get("/")
 @app.get("/api/health")
 def health_check():
+    """Minimal health check for load balancers"""
     return {
         "status": "ok", 
-        "version": "1.1.0",
-        "database": "postgres",
-        "auth_required": auth.AUTH_REQUIRED,
-        "supabase_url": bool(auth.SUPABASE_URL),
-        "supabase_jwt_secret_present": bool(auth.SUPABASE_JWT_SECRET),
-        "jwks_client_ready": bool(auth.jwks_cache.currsize > 0 if hasattr(auth.jwks_cache, "currsize") else "jwks" in auth.jwks_cache)
+        "version": "1.2.0"
     }
 
 @app.get("/whoami")
