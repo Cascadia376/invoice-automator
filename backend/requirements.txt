@@ -166,7 +166,6 @@ multidict==6.1.0
 multivolumefile==0.2.3
 mypy==1.5.1
 mypy-extensions==1.0.0
-mysql-connector-python==8.1.0
 narwhals==1.18.4
 nbclient==0.10.0
 nbconvert==7.16.4
