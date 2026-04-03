@@ -20,6 +20,49 @@ def normalize_currency(currency: str) -> str:
     """Always return CAD for this implementation."""
     return "CAD"
 
+
+def is_arterra_vendor(name: str) -> bool:
+    """Return True when a vendor name refers to Arterra."""
+    return bool(name) and "arterra" in name.lower()
+
+
+def _normalize_lookup_key(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(value).lower()).strip("_")
+
+
+def _get_normalized_item_value(item: dict, *candidate_keys: str):
+    normalized_item = {_normalize_lookup_key(key): value for key, value in item.items()}
+    for candidate_key in candidate_keys:
+        value = normalized_item.get(_normalize_lookup_key(candidate_key))
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def normalize_arterra_line_items(invoice_data: dict) -> dict:
+    """Prefer BCLDB codes as SKU values for Arterra invoices."""
+    vendor_name = str(invoice_data.get("vendor_name") or invoice_data.get("issuer") or "")
+    if not is_arterra_vendor(vendor_name):
+        return invoice_data
+
+    for item in invoice_data.get("line_items", []) or []:
+        if not isinstance(item, dict):
+            continue
+
+        preferred_sku = _get_normalized_item_value(
+            item,
+            "bcldb_no",
+            "bcldb code",
+            "bcldb_code",
+            "bcldb",
+            "sku"
+        )
+
+        if preferred_sku:
+            item["sku"] = str(preferred_sku).strip()
+
+    return invoice_data
+
 def safe_float(value, default=0.0):
     """Safely convert value to float."""
     if value is None:
@@ -52,6 +95,7 @@ def extract_invoice_data(file_path: str, org_id: str, s3_key: str = None, s3_buc
             print(f"DEBUG: Template found match: {result.get('issuer', 'Unknown')}")
             # Check if we have meaningful data, especially line items
             mapped_result = map_to_schema(result)
+            mapped_result = normalize_arterra_line_items(mapped_result)
             has_line_items = mapped_result.get('line_items') and len(mapped_result['line_items']) > 0
             
             if has_line_items:
@@ -173,6 +217,8 @@ def extract_with_llm_and_learn(file_path: str, org_id: str, s3_key: str = None, 
 CRITICAL INSTRUCTIONS FOR LINE ITEMS:
 - Each line item MUST have a UNIQUE SKU. If SKUs are not visible, use null.
 - DO NOT repeat the same SKU for multiple line items unless they are truly identical products.
+- For Arterra invoices, use the BCLDB NO / BCLDB code as the `sku` value.
+- For Arterra invoices, do NOT use the BOX CODE value as the `sku`.
 - Extract the EXACT quantity from each line. Common patterns:
   * "Qty" or "Quantity" column
   * Number before "x" (e.g., "5 x Product" means quantity=5)
@@ -344,6 +390,7 @@ options:
                     print(f"Error during math validation for item {item.get('description')}: {math_err}")
             
             invoice_data["currency"] = normalize_currency(invoice_data.get("currency"))
+            normalize_arterra_line_items(invoice_data)
             invoice_data["raw_extraction_results"] = json.dumps(invoice_data) # Store for learning
             outputs.append(invoice_data)
 
@@ -466,6 +513,7 @@ def refine_template_with_feedback(file_path: str, corrected_data: dict, org_id: 
         system_prompt = """You are an expert regex engineer for invoice parsing. 
         The user has provided a corrected value for a field that was missed or extracted incorrectly.
         Your job is to UPDATE the YAML template to correctly extract this value using Regex.
+        For Arterra invoices, the line-item SKU must come from the BCLDB NO / BCLDB code column, not the BOX CODE column.
         
         Return ONLY the updated YAML template string.
         """

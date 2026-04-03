@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Download } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { getApiBaseUrl } from "@/lib/apiBase";
+import { downloadBlob } from "@/lib/download";
 
 const Reports = () => {
     const { toast } = useToast();
@@ -40,14 +41,7 @@ const Reports = () => {
 
             // Trigger download
             const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `receiving_summary_${startDate}_${endDate}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+            await downloadBlob(blob, `receiving_summary_${startDate}_${endDate}.csv`);
 
             toast({
                 title: "Report Downloaded",

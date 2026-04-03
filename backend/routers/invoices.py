@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Backgro
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import hashlib
 import shutil
 import os
 import uuid
@@ -17,6 +18,7 @@ import models, schemas, auth
 from database import get_db
 from services import parser, textract_service, vendor_service, product_service, storage, validation_service, export_service, ingestion_service, ldb_service, ldb_parser, splitting_service
 from services.textract_service import parse_float
+from services.export_service import format_receiving_quantity
 
 router = APIRouter(
     prefix="/api/invoices",
@@ -27,7 +29,22 @@ router = APIRouter(
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 
-@router.post("/upload", response_model=List[schemas.Invoice])
+def _hash_file(file_path: str) -> str:
+    sha256 = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            sha256.update(chunk)
+    return sha256.hexdigest()
+
+
+def _find_invoice_by_file_hash(db: Session, org_id: str, file_hash: str):
+    return db.query(models.Invoice).filter(
+        models.Invoice.organization_id == org_id,
+        models.Invoice.source_file_hash == file_hash
+    ).first()
+
+
+@router.post("/upload", response_model=schemas.UploadInvoicesResponse)
 async def upload_invoice(
     file: UploadFile = File(...), 
     db: Session = Depends(get_db),
@@ -53,31 +70,49 @@ async def upload_invoice(
          raise HTTPException(status_code=400, detail="Invalid content type")
     # ----------------------
 
+    file_id = str(uuid.uuid4())
+    temp_dir = tempfile.gettempdir()
+    original_temp_path = os.path.join(temp_dir, f"original_{file_id}{file_ext}")
+    cleanup_paths = {original_temp_path}
+
     try:
-        file_id = str(uuid.uuid4())
-        # file_ext already calculated above
-        temp_dir = tempfile.gettempdir()
-        original_temp_path = os.path.join(temp_dir, f"original_{file_id}{file_ext}")
-        
         with open(original_temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-            
+
+        source_file_hash = _hash_file(original_temp_path)
+        duplicate_invoice = _find_invoice_by_file_hash(db, ctx.org_id, source_file_hash)
+        if duplicate_invoice:
+            return schemas.UploadInvoicesResponse(
+                status="skipped_duplicate",
+                created=[],
+                skipped=[
+                    schemas.UploadSkippedFile(
+                        filename=file.filename,
+                        reason="Duplicate file already uploaded",
+                        existing_invoice_id=duplicate_invoice.id,
+                        source_file_hash=source_file_hash
+                    )
+                ],
+                failed=[]
+            )
+
         # 1. Decide if splitting is needed (only for PDFs)
         print("STAGE 1: Checking for multi-invoice content...")
-        files_to_process = []
         if file_ext == ".pdf":
             print(f"DEBUG: Checking for multi-invoice content in {file.filename}")
             boundaries = splitting_service.detect_invoice_boundaries(original_temp_path)
-            
+
             # Use splitting service to isolate invoices (removes cover pages even if only 1 invoice found)
             split_paths = splitting_service.split_pdf_into_files(original_temp_path, boundaries)
             files_to_process = split_paths
+            cleanup_paths.update(split_paths)
         else:
             files_to_process = [original_temp_path]
 
         # 2. Process each file through ingestion
         print(f"STAGE 2: Processing {len(files_to_process)} file(s)...")
         created_invoices = []
+        failures = []
         for file_path in files_to_process:
             try:
                 invoices = ingestion_service.process_invoice(
@@ -85,29 +120,54 @@ async def upload_invoice(
                     file_path=file_path,
                     org_id=ctx.org_id,
                     user_id=ctx.user_id,
-                    original_filename=file.filename
+                    original_filename=file.filename,
+                    source_file_hash=source_file_hash
                 )
                 created_invoices.extend(invoices)
             except Exception as proc_error:
                 print(f"ERROR processing file {file_path}: {proc_error}")
                 import traceback
                 traceback.print_exc()
-                # Continue processing remaining files
+                failures.append(
+                    schemas.UploadFailedFile(
+                        filename=file.filename,
+                        reason=str(proc_error)
+                    )
+                )
 
-        if not created_invoices:
-            raise HTTPException(status_code=500, detail="Failed to process any invoices from the uploaded file")
+        if not created_invoices and failures:
+            return schemas.UploadInvoicesResponse(
+                status="failed",
+                created=[],
+                skipped=[],
+                failed=failures
+            )
 
         # Point to proxy endpoint
         for inv in created_invoices:
             if inv.file_url:
                  inv.file_url = f"/api/invoices/{inv.id}/file"
 
-        return created_invoices
+        return schemas.UploadInvoicesResponse(
+            status="completed",
+            created=created_invoices,
+            skipped=[],
+            failed=failures
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         error_detail = traceback.format_exc()
         print(f"ERROR processing invoice: {error_detail}")
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}\n{error_detail}")
+    finally:
+        for path in cleanup_paths:
+            try:
+                if path and os.path.exists(path):
+                    os.remove(path)
+            except Exception:
+                pass
 
 from sqlalchemy import or_
 
@@ -452,8 +512,16 @@ def delete_invoice(
     if db_invoice is None:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
+    file_url = db_invoice.file_url
     db.delete(db_invoice)
     db.commit()
+
+    if file_url and not file_url.startswith(("http://", "https://", "/api/")):
+        try:
+            storage.delete_file(file_url)
+        except Exception as e:
+            logger.warning(f"Failed to delete storage object for invoice {invoice_id}: {e}")
+
     return {"status": "success", "message": "Invoice deleted"}
 
 @router.patch("/{invoice_id}/post", response_model=schemas.Invoice)
@@ -823,7 +891,10 @@ def export_invoice_csv(
     csv_content = export_service.generate_csv(invoice)
     
     headers = {
-        'Content-Disposition': f'attachment; filename="invoice_{invoice.invoice_number or invoice_id}.csv"'
+        'Content-Disposition': f'attachment; filename="invoice_{invoice.invoice_number or invoice_id}.csv"',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'X-Content-Type-Options': 'nosniff'
     }
     
     return StreamingResponse(iter([csv_content]), media_type="text/csv", headers=headers)
@@ -861,7 +932,7 @@ def export_invoice_excel(
     for item in invoice.line_items:
         ws.append([
             item.sku or "N/A",
-            item.quantity,
+            format_receiving_quantity(item),
             item.amount
         ])
         
@@ -881,7 +952,10 @@ def export_invoice_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
             "Content-Disposition": f"attachment; filename=\"{filename}\"",
-            "Access-Control-Expose-Headers": "Content-Disposition"
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff"
         }
     )
 
@@ -968,7 +1042,7 @@ def export_invoices_bulk(
             ws.append(headers)
             
             for item in invoice.line_items:
-                ws.append([item.sku or "N/A", item.quantity, item.amount])
+                ws.append([item.sku or "N/A", format_receiving_quantity(item), item.amount])
                 
             safe_vendor = "".join(x for x in (invoice.vendor_name or "Unknown") if x.isalnum() or x in " -_").strip()
             safe_date = invoice.date or datetime.now().strftime("%Y-%m-%d")
@@ -986,7 +1060,10 @@ def export_invoices_bulk(
         media_type="application/zip",
         headers={
             "Content-Disposition": f"attachment; filename=\"Invoices_Export_{datetime.now().strftime('%Y%m%d')}.zip\"",
-            "Access-Control-Expose-Headers": "Content-Disposition"
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff"
         }
     )
 
@@ -1041,6 +1118,9 @@ def export_invoices_bulk_approved(
         media_type="application/zip",
         headers={
             "Content-Disposition": f"attachment; filename=\"Approved_Invoices_{datetime.now().strftime('%Y%m%d')}.zip\"",
-            "Access-Control-Expose-Headers": "Content-Disposition"
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff"
         }
     )

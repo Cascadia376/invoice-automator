@@ -1,11 +1,32 @@
 import csv
 import io
+from typing import Any
 from models import Invoice
+
+
+def format_receiving_quantity(item: Any) -> float | int:
+    """Return the receiving quantity in cases when available."""
+    cases = getattr(item, "cases", None)
+    try:
+        if cases not in (None, "") and float(cases) > 0:
+            value = float(cases)
+        else:
+            quantity = float(getattr(item, "quantity", 0) or 0)
+            units_per_case = float(getattr(item, "units_per_case", 0) or 0)
+            if quantity > 0 and units_per_case > 0:
+                value = quantity / units_per_case
+            else:
+                value = quantity
+    except (TypeError, ValueError):
+        value = float(getattr(item, "quantity", 0) or 0)
+
+    return int(value) if float(value).is_integer() else round(value, 2)
+
 
 def generate_csv(invoice: Invoice) -> str:
     """
     Generates a CSV string for the given invoice.
-    Format: Standard Import (SKU, Qty, Cost, Total)
+    Format: Standard Import (SKU, Cases, Cost, Total)
     """
     output = io.StringIO()
     writer = csv.writer(output)
@@ -20,7 +41,7 @@ def generate_csv(invoice: Invoice) -> str:
     for item in invoice.line_items:
         writer.writerow([
             item.sku or "",
-            item.quantity,
+            format_receiving_quantity(item),
             f"{item.amount:.2f}" if item.amount is not None else ""
         ])
         
@@ -84,7 +105,7 @@ def generate_ldb_report(invoice: Invoice) -> bytes:
 def generate_invoice_xlsx(invoice: Invoice) -> bytes:
     """
     Generates a single XLSX file for the given invoice.
-    Format: SKU, Receiving Qty (UOM), Confirmed Total Cost
+    Format: SKU, Receiving Qty (Cases), Confirmed Total Cost
     """
     from openpyxl import Workbook
     from openpyxl.styles import Font
@@ -104,7 +125,7 @@ def generate_invoice_xlsx(invoice: Invoice) -> bytes:
     for item in invoice.line_items:
         ws.append([
             item.sku or "",
-            item.quantity,
+            format_receiving_quantity(item),
             item.amount # Confirmed Total Cost
         ])
         

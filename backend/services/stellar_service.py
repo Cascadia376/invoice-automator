@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 import models
 from stellar_client import stellar_client
+from services.export_service import format_receiving_quantity
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ def generate_stellar_csv(line_items: List[models.LineItem]) -> BytesIO:
     for item in line_items:
         writer.writerow([
             item.sku or '',
-            item.quantity or 0,
+            format_receiving_quantity(item),
             item.amount or 0
         ])
     

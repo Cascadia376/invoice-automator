@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Search, Plus, Inbox, Beaker, MoreVertical, AlertCircle, Clock, FileText, FileDown, Trash2, CheckCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { getApiBaseUrl } from "@/lib/apiBase";
+import { downloadBlob } from "@/lib/download";
 
 import { StellarPostModal } from "@/components/invoice/StellarPostModal";
 
@@ -163,7 +164,7 @@ export default function Dashboard() {
         }
     };
 
-    const handleExportCSV = () => {
+    const handleExportCSV = async () => {
         if (filteredInvoices.length === 0) {
             toast.error("No invoices to export");
             return;
@@ -184,14 +185,7 @@ export default function Dashboard() {
         ].join("\n");
 
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        link.setAttribute("download", `invoices_export_${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = "hidden";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        await downloadBlob(blob, `invoices_export_${new Date().toISOString().split('T')[0]}.csv`);
         toast.success(`Exported ${filteredInvoices.length} invoices`);
     };
 
@@ -212,14 +206,7 @@ export default function Dashboard() {
             if (!response.ok) throw new Error("Export failed");
 
             const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `Invoices_Bulk_Export_${new Date().toISOString().split('T')[0]}.zip`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+            await downloadBlob(blob, `Invoices_Bulk_Export_${new Date().toISOString().split('T')[0]}.zip`);
 
             toast.success("Bulk export successful", {
                 description: `Exported ${ids.length} invoices to ZIP.`,
@@ -269,14 +256,7 @@ export default function Dashboard() {
             }
 
             const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `Approved_Invoices_${new Date().toISOString().split('T')[0]}.zip`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+            await downloadBlob(blob, `Approved_Invoices_${new Date().toISOString().split('T')[0]}.zip`);
 
             toast.success("Export successful", { id: toastId });
         } catch (error: any) {

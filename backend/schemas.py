@@ -1,4 +1,4 @@
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Dict
 from datetime import datetime
 
@@ -56,6 +56,7 @@ class InvoiceBase(BaseModel):
     po_number: Optional[str] = None
     status: str
     file_url: Optional[str] = None
+    source_file_hash: Optional[str] = None
     issue_type: Optional[str] = None
     is_posted: bool = False
     
@@ -94,6 +95,7 @@ class InvoiceUpdate(BaseModel):
     deposit_amount: Optional[float] = None
     issue_type: Optional[str] = None
     is_posted: Optional[bool] = None
+    source_file_hash: Optional[str] = None
     
     stellar_posted_at: Optional[datetime] = None
     stellar_asn_number: Optional[str] = None
@@ -115,6 +117,40 @@ class Invoice(InvoiceBase):
 
     model_config = {
         "from_attributes": True,
+        "populate_by_name": True,
+        "alias_generator": to_camel
+    }
+
+
+class UploadSkippedFile(BaseModel):
+    filename: str
+    reason: str
+    existing_invoice_id: Optional[str] = None
+    source_file_hash: Optional[str] = None
+
+    model_config = {
+        "populate_by_name": True,
+        "alias_generator": to_camel
+    }
+
+
+class UploadFailedFile(BaseModel):
+    filename: str
+    reason: str
+
+    model_config = {
+        "populate_by_name": True,
+        "alias_generator": to_camel
+    }
+
+
+class UploadInvoicesResponse(BaseModel):
+    status: str
+    created: List[Invoice] = Field(default_factory=list)
+    skipped: List[UploadSkippedFile] = Field(default_factory=list)
+    failed: List[UploadFailedFile] = Field(default_factory=list)
+
+    model_config = {
         "populate_by_name": True,
         "alias_generator": to_camel
     }

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Upload as UploadIcon, File as FileIcon, Loader2, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { UploadInvoicesResponse } from '@/types/invoice';
 
 export default function Upload() {
     const { uploadInvoice } = useInvoice();
@@ -49,11 +50,27 @@ export default function Upload() {
     const processFiles = async (files: File[]) => {
         setIsUploading(true);
         try {
-            // New logic: individual files being uploaded
+            let createdCount = 0;
+            let skippedCount = 0;
+            let failedCount = 0;
+
             for (const file of files) {
-                await uploadInvoice(file);
+                const result: UploadInvoicesResponse = await uploadInvoice(file);
+                createdCount += result.created.length;
+                skippedCount += result.skipped.length;
+                failedCount += result.failed.length;
             }
-            // Success is handled by InvoiceContext and navigate
+
+            if (createdCount > 0) {
+                toast.success(`Imported ${createdCount} new invoice(s)`, {
+                    description: skippedCount > 0
+                        ? `Skipped ${skippedCount} duplicate file(s).`
+                        : undefined,
+                });
+            } else if (skippedCount > 0 && failedCount === 0) {
+                toast.info(`Skipped ${skippedCount} duplicate file(s).`);
+            }
+
             navigate('/dashboard');
         } catch (error) {
             console.error(error);
@@ -83,12 +100,12 @@ export default function Upload() {
 
                     <div className="text-center space-y-2">
                         <h3 className="text-lg font-semibold">
-                            {isUploading ? 'Processing Invoices...' : 'Drag & Drop PDFs here'}
+                            {isUploading ? 'Processing Invoices...' : 'Drag & Drop PDFs or a folder here'}
                         </h3>
                         <p className="text-sm text-muted-foreground max-w-xs mx-auto">
                             {isUploading
                                 ? 'We are extracting data from your documents. This may take a moment.'
-                                : 'Or click to browse files from your computer'
+                                : 'Or click to browse files from your computer. Exact duplicates will be skipped automatically.'
                             }
                         </p>
                     </div>

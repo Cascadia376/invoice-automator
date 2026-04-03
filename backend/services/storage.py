@@ -97,9 +97,18 @@ def download_file(object_name: str, file_path: str):
         logger.error(f"Failed to download file from S3: {e}")
         return False
 
+
+def delete_file(object_name: str) -> bool:
+    client = storage_client._get_client()
+    try:
+        client.delete_object(Bucket=AWS_BUCKET_NAME, Key=object_name)
+        return True
+    except ClientError as e:
+        logger.error(f"Failed to delete file from S3: {e}")
+        return False
+
 def get_s3_client():
     """
     Expose the raw boto3 client for advanced operations (like streaming).
     """
     return storage_client._get_client()
-

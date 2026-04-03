@@ -25,6 +25,7 @@ class Invoice(Base):
     status = Column(String, default="ingested")
     issue_type = Column(String, nullable=True) # breakage, shortship, overship, misship
     file_url = Column(String, nullable=True)
+    source_file_hash = Column(String(64), index=True, nullable=True)
     raw_extraction_results = Column(String, nullable=True) # JSON string of raw Textract/LLM output
     ldb_report_url = Column(String, nullable=True) # URL/Key to the last generated LDB report
     vendor_id = Column(String, ForeignKey("vendors.id"), nullable=True)

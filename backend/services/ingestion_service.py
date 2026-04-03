@@ -14,7 +14,8 @@ def process_invoice(
     file_path: str,
     org_id: str,
     user_id: str,
-    original_filename: str = "invoice.pdf"
+    original_filename: str = "invoice.pdf",
+    source_file_hash: str | None = None
 ):
     """
     Core logic to ingest an invoice file:
@@ -98,6 +99,7 @@ def process_invoice(
             po_number=extracted_data.get("po_number"),
             status="needs_review",
             file_url=s3_key,
+            source_file_hash=source_file_hash,
             raw_extraction_results=extracted_data.get("raw_extraction_results"),
             vendor_id=vendor.id,
             store_id=resolved_store.store_id if resolved_store else None,

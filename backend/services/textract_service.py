@@ -1,6 +1,7 @@
 import boto3
 import os
 import json
+import re
 from typing import Dict, List, Optional
 
 # Configuration
@@ -48,6 +49,19 @@ def clean_text(text: str) -> str:
         return ''
     # Replace newlines with spaces, then collapse multiple spaces
     return ' '.join(text.replace('\n', ' ').split())
+
+
+def _normalize_field_name(field_name: str) -> str:
+    return re.sub(r"[^A-Z0-9]+", "_", str(field_name).upper()).strip("_")
+
+
+def _get_item_field_value(item_data: Dict[str, Dict], *candidate_names: str) -> Optional[str]:
+    normalized = {_normalize_field_name(key): value for key, value in item_data.items()}
+    for candidate_name in candidate_names:
+        entry = normalized.get(_normalize_field_name(candidate_name))
+        if entry and entry.get("value"):
+            return str(entry["value"]).strip()
+    return None
 
 def extract_invoice_with_textract(s3_bucket: str, s3_key: str) -> List[Dict]:
     """
@@ -112,11 +126,14 @@ def extract_invoice_with_textract(s3_bucket: str, s3_key: str) -> List[Dict]:
                         }
                     
                     # Map Textract fields to our schema
-                    sku = (
-                        item_data.get('PRODUCT_CODE', {}).get('value') or
-                        item_data.get('ITEM_CODE', {}).get('value') or
-                        item_data.get('SKU', {}).get('value') or
-                        None
+                    sku = _get_item_field_value(
+                        item_data,
+                        "BCLDB NO",
+                        "BCLDB",
+                        "BCLDB_CODE",
+                        "SKU",
+                        "PRODUCT_CODE",
+                        "ITEM_CODE"
                     )
                     
                     description = (

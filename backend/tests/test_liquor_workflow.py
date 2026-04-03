@@ -1,6 +1,9 @@
-import pytest
-from unittest.mock import MagicMock, patch
+import csv
 import io
+
+import pytest
+from unittest.mock import patch
+from openpyxl import load_workbook
 
 # Mock data
 MOCK_INVOICE_DATA = {
@@ -31,7 +34,7 @@ def mock_external_services():
     with patch("services.parser.extract_invoice_data") as mock_parser, \
          patch("services.storage.upload_file") as mock_storage:
         
-        mock_parser.return_value = MOCK_INVOICE_DATA
+        mock_parser.return_value = [MOCK_INVOICE_DATA]
         mock_storage.return_value = "s3://mock-bucket/invoice.pdf"
         yield mock_parser
 
@@ -42,9 +45,11 @@ def test_liquor_workflow(client, mock_external_services):
     
     response = client.post("/api/invoices/upload", files=files)
     assert response.status_code == 200
-    invoices = response.json()
-    assert isinstance(invoices, list)
-    invoice = invoices[0]
+    upload_result = response.json()
+    assert upload_result["status"] == "completed"
+    assert len(upload_result["created"]) == 1
+    assert upload_result["skipped"] == []
+    invoice = upload_result["created"][0]
     
     assert invoice["vendorName"] == "Test Liquor Vendor"
     assert len(invoice["lineItems"]) == 1
@@ -53,22 +58,60 @@ def test_liquor_workflow(client, mock_external_services):
     assert item["caseCost"] == 120.00
     
     invoice_id = invoice["id"]
+
+    # 1b. Same invoice number, different file bytes: allowed because dedupe is file-based
+    different_file = {"file": ("invoice-copy.pdf", b"different pdf content", "application/pdf")}
+    response = client.post("/api/invoices/upload", files=different_file)
+    assert response.status_code == 200
+    duplicate_invoice = response.json()
+    assert duplicate_invoice["status"] == "completed"
+    assert len(duplicate_invoice["created"]) == 1
+
+    # 1c. Exact same file bytes: skipped
+    response = client.post("/api/invoices/upload", files=files)
+    assert response.status_code == 200
+    skipped = response.json()
+    assert skipped["status"] == "skipped_duplicate"
+    assert len(skipped["created"]) == 0
+    assert len(skipped["skipped"]) == 1
+    assert skipped["skipped"][0]["existingInvoiceId"] == invoice_id
+
+    # 1d. Delete and re-upload the exact same file: allowed again
+    response = client.delete(f"/api/invoices/{invoice_id}")
+    assert response.status_code == 200
+    response = client.post("/api/invoices/upload", files=files)
+    assert response.status_code == 200
+    reuploaded = response.json()
+    assert reuploaded["status"] == "completed"
+    assert len(reuploaded["created"]) == 1
+    reuploaded_invoice_id = reuploaded["created"][0]["id"]
     
     # 2. Validate Invoice (Should be clean)
-    response = client.get(f"/api/invoices/{invoice_id}/validate")
+    response = client.get(f"/api/invoices/{reuploaded_invoice_id}/validate")
     assert response.status_code == 200
     validation = response.json()
     assert len(validation["global_warnings"]) == 0
     assert len(validation["line_items_warnings"]) == 0 if "line_items_warnings" in validation else True # Key might be line_item_warnings
-    
+
     # 3. Export CSV
-    response = client.get(f"/api/invoices/{invoice_id}/export/csv")
+    response = client.get(f"/api/invoices/{reuploaded_invoice_id}/export/csv")
     assert response.status_code == 200
     content = response.text
-    
+    rows = list(csv.reader(io.StringIO(content)))
+
     # Verify CSV Content
     assert "12345" in content
     assert "120.00" in content # Case Cost or Amount
+    assert rows[1][1] == "1"
+
+    # 4. Export Excel
+    response = client.get(f"/api/invoices/{reuploaded_invoice_id}/export/excel")
+    assert response.status_code == 200
+    workbook = load_workbook(io.BytesIO(response.content))
+    worksheet = workbook.active
+    assert worksheet["A2"].value == "12345"
+    assert worksheet["B2"].value == 1
+    assert worksheet["C2"].value == 120.0
 
 def test_validation_math_error(client, mock_external_services):
     # Create an invoice with math error attached to the mocked parser?
@@ -91,12 +134,12 @@ def test_validation_math_error(client, mock_external_services):
     ]
     
     with patch("services.parser.extract_invoice_data") as mock_parser:
-        mock_parser.return_value = bad_data
+        mock_parser.return_value = [bad_data]
         with patch("services.storage.upload_file"):
              response = client.post("/api/invoices/upload", files={"file": ("bad.pdf", b"x", "application/pdf")})
              assert response.status_code == 200
              invoices = response.json()
-             invoice_id = invoices[0]["id"]
+             invoice_id = invoices["created"][0]["id"]
              
     # Validate
     response = client.get(f"/api/invoices/{invoice_id}/validate")

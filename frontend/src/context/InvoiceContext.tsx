@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from "@/context/AuthContext";
-import { Invoice, DashboardStats, GLCategory } from '@/types/invoice';
+import { Invoice, DashboardStats, GLCategory, UploadInvoicesResponse } from '@/types/invoice';
 import { toast } from 'sonner';
 import { getApiBaseUrl } from "@/lib/apiBase";
 
@@ -14,7 +14,7 @@ interface InvoiceContextType {
     setPage: (page: number) => void;
     getInvoice: (id: string) => Invoice | undefined;
     updateInvoice: (id: string, data: Partial<Invoice>) => Promise<void>;
-    uploadInvoice: (file: File) => Promise<void>;
+    uploadInvoice: (file: File) => Promise<UploadInvoicesResponse>;
     deleteInvoice: (id: string) => void;
     refreshInvoices: (skip?: number, limit?: number, search?: string, status?: string) => Promise<void>;
     refreshStats: () => Promise<void>;
@@ -243,7 +243,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
     }, [invoices, getToken, orgId]);
 
-    const uploadInvoice = async (file: File) => {
+    const uploadInvoice = async (file: File): Promise<UploadInvoicesResponse> => {
         const formData = new FormData();
         formData.append('file', file);
 
@@ -255,19 +255,26 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 body: formData,
             });
 
-            if (response.ok) {
-                const newInvoices: Invoice[] = await response.json();
-                console.log("DEBUG: Upload success. New Invoices:", newInvoices);
-                setInvoices(prev => [...newInvoices, ...prev]);
-                setTotalCount(prev => prev + newInvoices.length);
-                toast.success(`Uploaded and processed ${newInvoices.length} invoice(s)!`);
-            } else {
-                console.error("DEBUG: Upload failed. Status:", response.status);
-                toast.error("Upload failed");
+            const result: UploadInvoicesResponse = await response.json();
+
+            if (!response.ok) {
+                throw new Error((result.failed?.[0]?.reason) || "Upload failed");
             }
+
+            if (result.created.length > 0) {
+                console.log("DEBUG: Upload success. New Invoices:", result.created);
+                setInvoices(prev => [...result.created, ...prev]);
+                setTotalCount(prev => prev + result.created.length);
+                toast.success(`Uploaded and processed ${result.created.length} invoice(s)!`);
+            } else if (result.skipped.length > 0) {
+                toast.info(`Skipped ${result.skipped.length} duplicate file(s).`);
+            }
+
+            return result;
         } catch (error) {
             console.error(error);
             toast.error("Network error uploading invoice");
+            return { status: "failed", created: [], skipped: [], failed: [{ filename: file.name, reason: "Network error uploading invoice" }] };
         }
     };
 

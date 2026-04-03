@@ -39,6 +39,7 @@ export interface Invoice {
   lineItems: LineItem[];
   issues?: Issue[];
   fileUrl?: string;
+  sourceFileHash?: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -112,4 +113,23 @@ export interface PreflightResponse {
 export interface BulkPostResult {
   success: { id: string; asn: string }[];
   failed: { id: string; reason: string }[];
+}
+
+export interface UploadSkippedFile {
+  filename: string;
+  reason: string;
+  existingInvoiceId?: string;
+  sourceFileHash?: string;
+}
+
+export interface UploadFailedFile {
+  filename: string;
+  reason: string;
+}
+
+export interface UploadInvoicesResponse {
+  status: 'completed' | 'skipped_duplicate' | 'failed';
+  created: Invoice[];
+  skipped: UploadSkippedFile[];
+  failed: UploadFailedFile[];
 }

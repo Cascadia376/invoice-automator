@@ -237,5 +237,22 @@ def migrate():
 
     print("Consolidated Migration complete!")
 
+
+def ensure_invoice_source_file_hash_column():
+    """Add the invoice source_file_hash column if it is missing."""
+    inspector = inspect(engine)
+    if "invoices" not in inspector.get_table_names():
+        return
+
+    invoice_columns = [c["name"] for c in inspector.get_columns("invoices")]
+    if "source_file_hash" in invoice_columns:
+        return
+
+    with engine.connect() as conn:
+        print("Adding source_file_hash to invoices...")
+        conn.execute(text("ALTER TABLE invoices ADD COLUMN source_file_hash VARCHAR(64)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_invoices_source_file_hash ON invoices (source_file_hash)"))
+        conn.commit()
+
 if __name__ == "__main__":
     migrate()

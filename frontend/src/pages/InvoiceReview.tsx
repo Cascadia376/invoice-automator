@@ -29,6 +29,7 @@ import "driver.js/dist/driver.css";
 import { useLocalDraft } from "@/hooks/useLocalDraft";
 import { useAuth } from "@/context/AuthContext";
 import { getApiBaseUrl } from "@/lib/apiBase";
+import { downloadBlob, getFilenameFromContentDisposition } from "@/lib/download";
 
 import { StellarPostModal } from "@/components/invoice/StellarPostModal";
 
@@ -39,6 +40,8 @@ export default function InvoiceReview() {
   const { getToken } = useAuth();
   const [invoice, setInvoice] = useState<Invoice | undefined>(undefined);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const latestInvoiceRef = useRef<Invoice | undefined>(undefined);
+  const getInvoiceRef = useRef(getInvoice);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [isPdfVisible, setIsPdfVisible] = useState(true);
   const { saveDraft, getDraft, clearDraft, hasDraft } = useLocalDraft();
@@ -64,6 +67,14 @@ export default function InvoiceReview() {
   const pdfUrl = getPdfUrl();
   const API_BASE = getApiBaseUrl();
 
+  useEffect(() => {
+    latestInvoiceRef.current = invoice;
+  }, [invoice]);
+
+  useEffect(() => {
+    getInvoiceRef.current = getInvoice;
+  }, [getInvoice]);
+
   // Main Data Load
   const fetchInvoiceData = async () => {
     if (!id) return;
@@ -78,54 +89,62 @@ export default function InvoiceReview() {
         setInvoice(data);
       } else {
         // Fallback to context
-        const data = getInvoice(id);
+        const data = getInvoiceRef.current(id);
         if (data) setInvoice(data);
       }
     } catch (e) {
       console.error("Failed to fetch fresh invoice", e);
-      const data = getInvoice(id);
+      const data = getInvoiceRef.current(id);
       if (data) setInvoice(data);
     }
   };
 
   useEffect(() => {
-    if (id) {
-      const data = getInvoice(id);
+    if (!id) return;
+
+    let cancelled = false;
+
+    const loadInvoice = async () => {
+      const data = getInvoiceRef.current(id);
       if (data) {
         setInvoice(data);
-
-        // Fetch highlights & validation
-        (async () => {
-          try {
-            const token = await getToken();
-            fetch(`${API_BASE}/api/invoices/${id}/highlights`, {
-              headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
-            })
-              .then(res => res.json())
-              .then(data => setHighlights(data))
-              .catch(err => console.error("Failed to load highlights", err));
-
-            fetch(`${API_BASE}/api/invoices/${id}/validate`, {
-              headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
-            })
-              .then(res => res.json())
-              .then(data => setValidationWarnings(data))
-              .catch(err => console.error("Failed to load validation", err));
-          } catch (err) {
-            console.error("Auth error", err);
-          }
-        })();
-      } else {
-        if (!isLoading) {
-          // Try fetching directly if not in context yet? 
-          // For now, redirect.
-          toast.error("Invoice not found or loading...");
-          // navigate("/dashboard"); 
-          // Commented out navigate to prevent flashing if context is slow
-        }
+      } else if (!isLoading) {
+        // Try fetching directly if not in context yet.
+        await fetchInvoiceData();
       }
-    }
-  }, [id, getInvoice, isLoading]);
+
+      try {
+        const token = await getToken();
+        if (cancelled) return;
+
+        fetch(`${API_BASE}/api/invoices/${id}/highlights`, {
+          headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (!cancelled) setHighlights(data);
+          })
+          .catch(err => console.error("Failed to load highlights", err));
+
+        fetch(`${API_BASE}/api/invoices/${id}/validate`, {
+          headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (!cancelled) setValidationWarnings(data);
+          })
+          .catch(err => console.error("Failed to load validation", err));
+      } catch (err) {
+        console.error("Auth error", err);
+      }
+    };
+
+    loadInvoice();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, isLoading]);
 
   // Draft Check - Only on entry or ID change
   useEffect(() => {
@@ -192,13 +211,12 @@ export default function InvoiceReview() {
   }, [invoice]); // Still depend on invoice, but gated by ref
 
   const handleDataChange = (updates: Partial<Invoice>) => {
-    if (invoice) {
+    if (id) {
       // Update local state immediately for responsive UI
-      const newData = { ...invoice, ...updates };
-      setInvoice(newData);
+      setInvoice(prev => prev ? { ...prev, ...updates } : prev);
 
       // Save local draft immediately
-      saveDraft(invoice.id, updates);
+      saveDraft(id, updates);
 
       // Clear existing timeout
       if (saveTimeoutRef.current) {
@@ -207,15 +225,16 @@ export default function InvoiceReview() {
 
       // Debounce the save - wait 1 second after user stops typing
       saveTimeoutRef.current = setTimeout(() => {
-        updateInvoice(invoice.id, updates);
+        updateInvoice(id, updates);
       }, 1000);
     }
   };
 
   const handleSave = () => {
-    if (invoice && saveTimeoutRef.current) {
+    const currentInvoice = latestInvoiceRef.current;
+    if (currentInvoice && saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
-      updateInvoice(invoice.id, invoice); // Force immediate save
+      updateInvoice(currentInvoice.id, currentInvoice); // Force immediate save
       toast.success("Changes saved");
     }
   };
@@ -304,23 +323,11 @@ export default function InvoiceReview() {
       if (!response.ok) throw new Error("Export failed");
 
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-
-      // Get filename from header if possible, else fallback
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = `Invoice_${invoice.id}.xlsx`;
-      if (contentDisposition) {
-        const matches = /filename="?([^"]+)"?/.exec(contentDisposition);
-        if (matches && matches[1]) filename = matches[1];
-      }
-
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const filename = getFilenameFromContentDisposition(
+        response.headers.get("Content-Disposition"),
+        `Invoice_${invoice.id}.xlsx`
+      );
+      await downloadBlob(blob, filename);
 
       toast.success("Excel exported successfully");
     } catch (error: any) {
@@ -435,22 +442,11 @@ export default function InvoiceReview() {
                     if (!response.ok) throw new Error("Report generation failed");
 
                     const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-
-                    const contentDisposition = response.headers.get('Content-Disposition');
-                    let filename = `LDB_Report.xlsx`;
-                    if (contentDisposition) {
-                      const matches = /filename="?([^"]+)"?/.exec(contentDisposition);
-                      if (matches && matches[1]) filename = matches[1];
-                    }
-
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
+                    const filename = getFilenameFromContentDisposition(
+                      response.headers.get("Content-Disposition"),
+                      "LDB_Report.xlsx"
+                    );
+                    await downloadBlob(blob, filename);
 
                     toast.success("LDB Report downloaded");
                   } catch (error: any) {
@@ -496,14 +492,7 @@ export default function InvoiceReview() {
                     if (!response.ok) throw new Error('Export failed');
 
                     const blob = await response.blob();
-                    const objectUrl = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = objectUrl;
-                    a.download = `invoice-${invoice.invoiceNumber || 'export'}.csv`;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(objectUrl);
-                    document.body.removeChild(a);
+                    await downloadBlob(blob, `invoice-${invoice.invoiceNumber || 'export'}.csv`);
 
                     toast.success("CSV file has been downloaded", {
                       description: "Export Successful",
