@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
+import { getApiBaseUrl } from "@/lib/apiBase";
 
 export type Store = {
   id: string;
@@ -24,6 +25,7 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const API_BASE = getApiBaseUrl();
   const disableAuth = import.meta.env.VITE_DISABLE_AUTH === "true";
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -36,7 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchRoles = async (userId: string, orgId: string, token: string) => {
     try {
       console.log(`[AuthDebug] Fetching roles for User: ${userId}, Org: ${orgId}`);
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/users/me/roles`, {
+      const res = await fetch(`${API_BASE}/api/users/me/roles`, {
         headers: { Authorization: `Bearer ${token}`, "x-organization-id": orgId }
       });
 
@@ -52,7 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchStores = async (token: string) => {
     try {
       console.log("[AuthDebug] Fetching stores...");
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/users/me/stores`, {
+      const res = await fetch(`${API_BASE}/api/users/me/stores`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -86,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // 1. Check if backend tells us who we are (JWT claims)
         try {
-          const whoamiRes = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/whoami`, {
+          const whoamiRes = await fetch(`${API_BASE}/api/whoami`, {
             headers: { Authorization: `Bearer ${data.session.access_token}` }
           });
 

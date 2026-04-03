@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { getApiBaseUrl } from "@/lib/apiBase";
 import { ArrowLeft, Activity, Shield, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -23,7 +24,7 @@ const SmokeTest = () => {
     const [whoami, setWhoami] = useState<{ data: WhoAmIRes | null; error: string | null }>({ data: null, error: null });
     const [loading, setLoading] = useState(true);
 
-    const API_URL = import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com';
+    const API_URL = getApiBaseUrl();
 
     useEffect(() => {
         const fetchData = async () => {

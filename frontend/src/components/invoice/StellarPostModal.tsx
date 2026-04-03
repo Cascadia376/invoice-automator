@@ -11,9 +11,9 @@ import { toast } from 'sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { getApiBaseUrl } from "@/lib/apiBase";
 
-const API_BASE = import.meta.env.VITE_API_BASE ||
-    (import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000');
+const API_BASE = getApiBaseUrl();
 
 interface StellarPostModalProps {
     invoiceIds: string[];

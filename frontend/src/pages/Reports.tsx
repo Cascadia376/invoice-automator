@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Download } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { getApiBaseUrl } from "@/lib/apiBase";
 
 const Reports = () => {
     const { toast } = useToast();
@@ -25,7 +26,7 @@ const Reports = () => {
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
             const response = await fetch(
-                `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/reports/receiving-summary?start_date=${startDate}&end_date=${endDate}`,
+                `${getApiBaseUrl()}/api/reports/receiving-summary?start_date=${startDate}&end_date=${endDate}`,
                 {
                     method: 'GET',
                     headers

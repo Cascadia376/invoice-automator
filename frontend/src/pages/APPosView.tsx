@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, FileText, Download, CheckCircle, TrendingUp, DollarSign, ListFilter } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
+import { getApiBaseUrl } from "@/lib/apiBase";
 
 interface CategorySummary {
     category_totals: Record<string, number>;
@@ -24,7 +25,7 @@ export default function APPosView() {
     const [summary, setSummary] = useState<CategorySummary | null>(null);
     const [loading, setLoading] = useState(true);
 
-    const API_BASE = import.meta.env.PROD ? 'https://invoice-backend-a1gb.onrender.com' : 'http://localhost:8000';
+    const API_BASE = getApiBaseUrl();
 
     const fetchSummary = async () => {
         setLoading(true);

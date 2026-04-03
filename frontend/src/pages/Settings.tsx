@@ -33,6 +33,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { getApiBaseUrl } from "@/lib/apiBase";
 import { Plus, Pencil, Trash2, Loader2, Shield, Activity, Globe, MapPin, ToggleLeft, ToggleRight, Settings2, Save } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -105,7 +106,7 @@ export default function Settings() {
     const testAdminConnection = async () => {
         try {
             const token = await getToken();
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/admin/connection-status`, {
+            const res = await fetch(`${getApiBaseUrl()}/api/admin/connection-status`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const data = await res.json();
@@ -162,7 +163,7 @@ export default function Settings() {
     const fetchOrgs = async () => {
         try {
             const token = await getToken();
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/admin/organizations`, {
+            const res = await fetch(`${getApiBaseUrl()}/api/admin/organizations`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (res.ok) {
@@ -178,7 +179,7 @@ export default function Settings() {
         setLoadingUsers(true);
         try {
             const token = await getToken();
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/admin/users`, {
+            const res = await fetch(`${getApiBaseUrl()}/api/admin/users`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (res.ok) {
@@ -198,7 +199,7 @@ export default function Settings() {
         setLoadingUsers(true);
         try {
             const token = await getToken();
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/admin/users/${editingUser.id}`, {
+            const res = await fetch(`${getApiBaseUrl()}/api/admin/users/${editingUser.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -228,7 +229,7 @@ export default function Settings() {
 
         try {
             const token = await getToken();
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/admin/users/${userId}`, {
+            const res = await fetch(`${getApiBaseUrl()}/api/admin/users/${userId}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -259,7 +260,7 @@ export default function Settings() {
         setLoadingUsers(true);
         try {
             const token = await getToken();
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/admin/users`, {
+            const res = await fetch(`${getApiBaseUrl()}/api/admin/users`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -367,7 +368,7 @@ export default function Settings() {
         setUpdatingOrg(orgId);
         try {
             const token = await getToken();
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/admin/organizations/${orgId}`, {
+            const res = await fetch(`${getApiBaseUrl()}/api/admin/organizations/${orgId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -397,7 +398,7 @@ export default function Settings() {
         try {
             const token = await getToken();
             const data = JSON.parse(bulkJson);
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://invoice-backend-a1gb.onrender.com'}/api/stellar/bulk-import`, {
+            const res = await fetch(`${getApiBaseUrl()}/api/stellar/bulk-import`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
