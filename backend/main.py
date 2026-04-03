@@ -28,8 +28,6 @@ if IS_PROD:
 
 ENABLE_DEBUG_ROUTES = os.getenv("ENABLE_DEBUG_ROUTES", "false").lower() == "true"
 
-models.Base.metadata.create_all(bind=database.engine)
-
 app = FastAPI(
     title="Invoice Automator API",
     description="Backend API for Invoice Automator",
@@ -49,7 +47,7 @@ origins = [
 ]
 
 # Strict CORS for production
-allow_origin_regex = "https://.*\.vercel\.app" if not IS_PROD else None
+allow_origin_regex = r"https://.*\.vercel\.app" if not IS_PROD else None
 
 app.add_middleware(
     CORSMiddleware,
@@ -120,6 +118,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(SizeLimitMiddleware)
+
+
+@app.on_event("startup")
+def initialize_database_schema() -> None:
+    """Create missing tables without blocking application startup."""
+    try:
+        models.Base.metadata.create_all(bind=database.engine)
+    except Exception as exc:
+        print(f"DATABASE: Skipping create_all during startup: {exc}")
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):

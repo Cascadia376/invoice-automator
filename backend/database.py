@@ -3,6 +3,10 @@ from sqlalchemy import create_engine
 
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv, find_dotenv
+
+# Load local environment variables when running outside Render.
+load_dotenv(find_dotenv(usecwd=True), override=False)
 
 # Get DB URL from env
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
