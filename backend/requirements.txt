@@ -20,7 +20,6 @@ asyncpg==0.30.0
 attrs==24.2.0
 babel==2.16.0
 backports.zstd==1.2.0
-baml==0.19.1
 beautifulsoup4==4.12.3
 billiard==4.2.1
 blabel==0.1.6
