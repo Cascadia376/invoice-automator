@@ -23,15 +23,15 @@ Due to database connectivity issues (`localhost:5432` Connection Refused), we de
 
 3. **Database Sync (Completed):**
    - Method: Supabase REST API (via `backend/scripts/sync_json_to_supabase_api.py`)
-   - Action: Sycned 1302 invoices to `supplier_invoices` and `supplier_invoice_items`.
+   - Action: Synced 1302 invoices to `supplier_invoices` and `supplier_invoice_items`.
    - **Fixes Applied:**
-     - Aggregated duplicates SKUs (summed quantities, averaged cost) to satisfy unique constraint `(invoice_id, sku)`.
-     - Sanitized date fields to prevent "invalid syntax" errors for empty strings.
+     - Aggregated duplicate SKUs (summed quantities, averaged cost) to satisfy unique constraint `(invoice_id, sku)`.
+     - Sanitized date fields to prevent invalid syntax errors for empty strings.
 
 ## Key Changes
 - **API Discovery:** Identified `stock-import.stellarpos.io` as the correct host for invoice data.
-- **Models:** Updated `SupplierInvoice` and `SupplierInvoiceItem` in `models.py`. 
-    - *Note:* Renamed `metadata` -> `meta_data` to match SQLAlchemy best practices.
+- **Models:** Updated `SupplierInvoice` and `SupplierInvoiceItem` in `models.py`.
+  - *Note:* Renamed `metadata` -> `meta_data` to match SQLAlchemy best practices.
 - **Service:** Updated `stellar_service.py` to use robust JSON parsing and correct endpoints.
 
 ## Verification
@@ -49,11 +49,13 @@ The generated report matches the format requested:
 I have set up a **GitHub Action** to automatically pull new invoices every day at 8:00 AM UTC.
 
 **Setup Required:**
-You must add the following **Secrets** to your GitHub Repository (Settings -> Secrets and variables -> Actions):
-1.  `SUPABASE_URL`: `https://wobndqnfqtumbyxxtojl.supabase.co`
-2.  `SUPABASE_SERVICE_ROLE_KEY`: `sb_secret_wCoX...` (The one you provided)
-3.  `STELLAR_API_TOKEN`: (Your existing Stellar Token)
-4.  `STELLAR_TENANT_ID`: `cascadialiquor`
+Add these secrets to the GitHub repository under Settings -> Secrets and variables -> Actions:
+1. `SUPABASE_URL`: project URL
+2. `SUPABASE_SERVICE_ROLE_KEY`: current server-side service-role credential
+3. `STELLAR_API_TOKEN`: Stellar API token
+4. `STELLAR_TENANT_ID`: `cascadialiquor`
+
+Never commit credential values to source control.
 
 **Workflow File:** `.github/workflows/daily_sync.yml`
 **Script:** `backend/scripts/daily_auto_sync.py`
@@ -63,4 +65,3 @@ I have added a new **Reports** page to the application.
 - **Location:** Sidebar -> Reports
 - **Functionality:** Select any date range (Start/End) and download the **Receiving Summary CSV**.
 - **Data Source:** Generates the report dynamically from the database, ensuring it always includes the latest synced invoices.
-
