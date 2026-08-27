@@ -1,8 +1,12 @@
+import os
 import requests
 import logging
 
-SUPABASE_URL = "https://wobndqnfqtumbyxxtojl.supabase.co"
-SUPABASE_KEY = "sb_secret_wCoX-veuddkQ-S-23vmadA_fkvQ-bz_"
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://wobndqnfqtumbyxxtojl.supabase.co")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+if not SUPABASE_KEY:
+    raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY is required")
 
 HEADERS = {
     "apikey": SUPABASE_KEY,
@@ -16,15 +20,15 @@ def verify_sync():
         f"{SUPABASE_URL}/rest/v1/supplier_invoices?select=count",
         headers={**HEADERS, "Range-Unit": "items", "Prefer": "count=exact"},
     )
-    
+
     # Range-Unit: items
     # Content-Range: 0-0/44  <-- Total is 44
     content_range = resp.headers.get("Content-Range", "0-0/0")
     try:
         total_invoices = content_range.split("/")[-1]
-    except:
+    except Exception:
         total_invoices = "Unknown"
-    
+
     print(f"Total Invoices in Database: {total_invoices}")
 
     # Check for specific Invoice
@@ -33,7 +37,7 @@ def verify_sync():
         f"{SUPABASE_URL}/rest/v1/supplier_invoices?invoice_id=eq.{check_asn}&select=*",
         headers=HEADERS
     )
-    
+
     if item_resp.status_code == 200 and len(item_resp.json()) > 0:
         print(f"Verified {check_asn}: EXISTS")
     else:
